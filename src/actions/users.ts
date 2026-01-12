@@ -91,7 +91,7 @@ export async function createUser(formData: FormData) {
     data: {
       name: validated.data.name,
       email: validated.data.email,
-      password: hashedPassword,
+      passwordHash: hashedPassword,
       role: validated.data.role,
       tenantId: session.user.tenantId,
     },
