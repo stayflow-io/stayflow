@@ -35,7 +35,8 @@ export async function getProperties(filters?: {
   const page = filters?.page || 1
   const skip = (page - 1) * ITEMS_PER_PAGE
 
-  const where = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {
     tenantId: session.user.tenantId,
     deletedAt: null,
     ...(filters?.status && { status: filters.status }),
