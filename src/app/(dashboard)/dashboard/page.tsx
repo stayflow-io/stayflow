@@ -1,8 +1,9 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart } from "lucide-react"
+import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart, Sparkles } from "lucide-react"
 import { getDashboardStats, getRevenueByMonth, getOccupancyByProperty, getReservationsByStatus } from "@/actions/dashboard"
+import { getRevenueForecast } from "@/actions/reports"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { RevenueChart } from "@/components/charts/revenue-chart"
@@ -10,11 +11,12 @@ import { OccupancyChart } from "@/components/charts/occupancy-chart"
 import { ReservationsByStatusChart } from "@/components/charts/reservations-by-status"
 
 export default async function DashboardPage() {
-  const [data, revenueData, occupancyData, statusData] = await Promise.all([
+  const [data, revenueData, occupancyData, statusData, forecastData] = await Promise.all([
     getDashboardStats(),
     getRevenueByMonth(),
     getOccupancyByProperty(),
     getReservationsByStatus(),
+    getRevenueForecast(),
   ])
 
   const hasAlerts = data.overdueTasks > 0 || data.todayCheckins.length > 0 || data.todayCheckouts.length > 0 || data.pendingPayouts > 0
@@ -308,6 +310,60 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Previsao de Receita */}
+      {forecastData && forecastData.forecast.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              Previsao de Receita
+            </CardTitle>
+            <CardDescription>
+              Receita prevista com base nas reservas confirmadas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+              <div className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 rounded-lg">
+                <p className="text-sm text-muted-foreground">Receita Prevista</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                  {new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(forecastData.totals.revenue)}
+                </p>
+              </div>
+              <div className="p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">Reservas Confirmadas</p>
+                <p className="text-2xl font-bold">{forecastData.totals.reservations}</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {forecastData.forecast.map((month) => {
+                const [year, monthNum] = month.month.split("-")
+                const monthName = format(new Date(parseInt(year), parseInt(monthNum) - 1), "MMMM yyyy", { locale: ptBR })
+                return (
+                  <div key={month.month} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                      <p className="font-medium capitalize">{monthName}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {month.reservations} reserva{month.reservations !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                    <p className="font-bold text-green-600 dark:text-green-400">
+                      {new Intl.NumberFormat("pt-BR", {
+                        style: "currency",
+                        currency: "BRL",
+                      }).format(month.revenue)}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

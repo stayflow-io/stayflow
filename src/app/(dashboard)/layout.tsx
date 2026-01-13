@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Header } from "@/components/layout/header"
 import { MobileNav } from "@/components/layout/mobile-nav"
+import { NotificationProvider } from "@/components/notifications/notification-provider"
 
 export default function DashboardLayout({
   children,
@@ -43,7 +44,14 @@ export default function DashboardLayout({
         userName={session?.user?.name}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header onMenuClick={() => setMobileNavOpen(true)} />
+        <NotificationProvider>
+          {(notifications) => (
+            <Header
+              onMenuClick={() => setMobileNavOpen(true)}
+              notifications={notifications}
+            />
+          )}
+        </NotificationProvider>
         <main className="flex-1 p-6 bg-muted/30 overflow-y-auto">
           {children}
         </main>

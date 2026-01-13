@@ -3,7 +3,7 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { signIn } from "next-auth/react"
+import { signIn, useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 
 export default function LoginPage() {
   const router = useRouter()
+  const { update } = useSession()
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -33,7 +34,16 @@ export default function LoginPage() {
       if (result?.error) {
         setError("Email ou senha incorretos")
       } else {
-        router.push("/properties")
+        // Fetch session to get user role
+        const session = await update()
+        const role = session?.user?.role
+
+        // Redirect based on role
+        if (role === "OWNER") {
+          router.push("/portal")
+        } else {
+          router.push("/dashboard")
+        }
         router.refresh()
       }
     } catch {
