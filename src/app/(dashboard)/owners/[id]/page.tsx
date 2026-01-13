@@ -58,35 +58,35 @@ export default async function OwnerDetailPage({ params }: Props) {
               ) : (
                 <div className="space-y-4">
                   {owner.properties.map((property) => (
-                    <Link key={property.id} href={`/properties/${property.id}`}>
-                      <div className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
-                            <Building2 className="h-6 w-6 text-muted-foreground" />
+                    <Link key={property.id} href={`/properties/${property.id}`} className="block">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:shadow-md transition-shadow gap-3">
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Building2 className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
                           </div>
-                          <div>
-                            <p className="font-semibold">{property.name}</p>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{property.name}</p>
                             <div className="flex items-center text-sm text-muted-foreground">
-                              <MapPin className="h-3 w-3 mr-1" />
-                              {property.city}, {property.state}
+                              <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate">{property.city}, {property.state}</span>
                             </div>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                              <span className="flex items-center">
+                              <span className="flex items-center" title="Quartos">
                                 <Bed className="h-3 w-3 mr-1" />
                                 {property.bedrooms}
                               </span>
-                              <span className="flex items-center">
+                              <span className="flex items-center" title="Banheiros">
                                 <Bath className="h-3 w-3 mr-1" />
                                 {property.bathrooms}
                               </span>
-                              <span className="flex items-center">
+                              <span className="flex items-center" title="Hóspedes">
                                 <Users className="h-3 w-3 mr-1" />
                                 {property.maxGuests}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <Badge variant={property.status === "ACTIVE" ? "default" : "secondary"}>
+                        <Badge variant={property.status === "ACTIVE" ? "default" : "secondary"} className="self-start sm:self-center">
                           {property.status === "ACTIVE" ? "Ativo" : property.status === "INACTIVE" ? "Inativo" : "Manutencao"}
                         </Badge>
                       </div>

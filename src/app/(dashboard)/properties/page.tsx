@@ -75,18 +75,18 @@ export default async function PropertiesPage({ searchParams }: Props) {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center">
+                    <div className="flex items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center" title="Quartos">
                         <Bed className="h-4 w-4 mr-1" />
-                        {property.bedrooms} quartos
+                        {property.bedrooms}<span className="hidden sm:inline ml-1">quartos</span>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center" title="Banheiros">
                         <Bath className="h-4 w-4 mr-1" />
-                        {property.bathrooms} banhos
+                        {property.bathrooms}<span className="hidden sm:inline ml-1">banhos</span>
                       </div>
-                      <div className="flex items-center">
+                      <div className="flex items-center" title="Hóspedes">
                         <Users className="h-4 w-4 mr-1" />
-                        {property.maxGuests} hospedes
+                        {property.maxGuests}<span className="hidden sm:inline ml-1">hospedes</span>
                       </div>
                     </div>
                     <div className="mt-3 pt-3 border-t flex items-center justify-between text-sm">
