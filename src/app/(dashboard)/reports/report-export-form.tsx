@@ -12,6 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Download, Loader2 } from "lucide-react"
+import { getReservationsReportData, getFinancialReportData } from "@/actions/reports"
+import { generateReservationsReport, generateFinancialTransactionsReport } from "@/lib/pdf"
 
 interface Props {
   reportType: "reservations" | "financial"
@@ -28,6 +30,28 @@ export function ReportExportForm({ reportType, description }: Props) {
     setIsLoading(true)
 
     try {
+      // Handle PDF export client-side
+      if (format === "pdf") {
+        const periodStart = startDate ? new Date(startDate) : undefined
+        const periodEnd = endDate ? new Date(endDate) : undefined
+
+        if (reportType === "reservations") {
+          const data = await getReservationsReportData(periodStart, periodEnd)
+          if (data) {
+            const doc = generateReservationsReport(data)
+            doc.save(`reservas_${new Date().toISOString().split("T")[0]}.pdf`)
+          }
+        } else if (reportType === "financial") {
+          const data = await getFinancialReportData(periodStart, periodEnd)
+          if (data) {
+            const doc = generateFinancialTransactionsReport(data)
+            doc.save(`financeiro_${new Date().toISOString().split("T")[0]}.pdf`)
+          }
+        }
+        return
+      }
+
+      // Handle Excel/CSV export via API
       const params = new URLSearchParams()
       params.set("format", format)
       if (startDate) params.set("startDate", startDate)
@@ -89,6 +113,7 @@ export function ReportExportForm({ reportType, description }: Props) {
           <SelectContent>
             <SelectItem value="xlsx">Excel (.xlsx)</SelectItem>
             <SelectItem value="csv">CSV (.csv)</SelectItem>
+            <SelectItem value="pdf">PDF (.pdf)</SelectItem>
           </SelectContent>
         </Select>
       </div>

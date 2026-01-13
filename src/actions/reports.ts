@@ -281,3 +281,76 @@ export async function getRevenueForecast() {
     },
   }
 }
+
+export interface FinancialTransactionsReportData {
+  periodStart: Date
+  periodEnd: Date
+  transactions: {
+    date: Date
+    type: string
+    category: string
+    property: string
+    description: string
+    amount: number
+  }[]
+  totals: {
+    income: number
+    expenses: number
+    balance: number
+  }
+}
+
+export async function getFinancialReportData(
+  periodStart?: Date,
+  periodEnd?: Date
+): Promise<FinancialTransactionsReportData | null> {
+  const session = await auth()
+  if (!session?.user?.tenantId) return null
+
+  const start = periodStart || startOfMonth(new Date())
+  const end = periodEnd || endOfMonth(new Date())
+
+  const transactions = await prisma.transaction.findMany({
+    where: {
+      tenantId: session.user.tenantId,
+      date: {
+        gte: start,
+        lte: end,
+      },
+    },
+    include: {
+      property: true,
+    },
+    orderBy: {
+      date: "desc",
+    },
+  })
+
+  const mapped = transactions.map((t) => ({
+    date: t.date,
+    type: t.type,
+    category: t.category,
+    property: t.property.name,
+    description: t.description || "",
+    amount: Number(t.amount),
+  }))
+
+  const income = transactions
+    .filter((t) => t.type === "INCOME")
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+
+  const expenses = transactions
+    .filter((t) => t.type === "EXPENSE")
+    .reduce((sum, t) => sum + Number(t.amount), 0)
+
+  return {
+    periodStart: start,
+    periodEnd: end,
+    transactions: mapped,
+    totals: {
+      income,
+      expenses,
+      balance: income - expenses,
+    },
+  }
+}

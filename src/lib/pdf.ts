@@ -264,3 +264,71 @@ export function generateReservationsReport(data: ReservationsReportData): jsPDF 
 
   return doc
 }
+
+interface FinancialTransactionsReportData {
+  periodStart: Date
+  periodEnd: Date
+  transactions: {
+    date: Date
+    type: string
+    category: string
+    property: string
+    description: string
+    amount: number
+  }[]
+  totals: {
+    income: number
+    expenses: number
+    balance: number
+  }
+}
+
+export function generateFinancialTransactionsReport(data: FinancialTransactionsReportData): jsPDF {
+  const doc = new jsPDF("landscape")
+
+  // Header
+  doc.setFontSize(20)
+  doc.setFont("helvetica", "bold")
+  doc.text("StayFlow", 14, 20)
+
+  doc.setFontSize(16)
+  doc.text("Relatorio Financeiro", 14, 30)
+
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+  doc.text(
+    `Periodo: ${format(data.periodStart, "dd/MM/yyyy")} a ${format(data.periodEnd, "dd/MM/yyyy")}`,
+    14,
+    40
+  )
+  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 46)
+
+  // Table
+  autoTable(doc, {
+    startY: 56,
+    head: [["Data", "Tipo", "Categoria", "Imovel", "Descricao", "Valor"]],
+    body: data.transactions.map((t) => [
+      format(t.date, "dd/MM/yyyy"),
+      t.type === "INCOME" ? "Receita" : "Despesa",
+      t.category,
+      t.property,
+      t.description || "-",
+      formatCurrency(t.amount),
+    ]),
+    theme: "striped",
+    headStyles: { fillColor: [51, 51, 51] },
+    styles: { fontSize: 9 },
+    margin: { left: 14, right: 14 },
+  })
+
+  const finalY = (doc as any).lastAutoTable.finalY + 10
+
+  // Totals
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "bold")
+  doc.text(`Receitas: ${formatCurrency(data.totals.income)}`, 14, finalY)
+  doc.text(`Despesas: ${formatCurrency(data.totals.expenses)}`, 100, finalY)
+  doc.text(`Saldo: ${formatCurrency(data.totals.balance)}`, 180, finalY)
+
+  return doc
+}
