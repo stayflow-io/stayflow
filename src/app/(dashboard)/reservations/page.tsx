@@ -78,36 +78,36 @@ export default async function ReservationsPage({ searchParams }: Props) {
                 <Link key={reservation.id} href={`/reservations/${reservation.id}`}>
                   <Card className="hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <div className="p-3 bg-muted rounded-lg text-center min-w-[70px]">
-                            <p className="text-2xl font-bold">
+                          <div className="p-3 bg-muted rounded-lg text-center min-w-[60px] sm:min-w-[70px]">
+                            <p className="text-xl sm:text-2xl font-bold">
                               {format(new Date(reservation.checkinDate), "dd")}
                             </p>
                             <p className="text-xs text-muted-foreground uppercase">
                               {format(new Date(reservation.checkinDate), "MMM", { locale: ptBR })}
                             </p>
                           </div>
-                          <div>
-                            <p className="font-semibold text-lg">{reservation.guestName}</p>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-semibold text-base sm:text-lg truncate">{reservation.guestName}</p>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
                               <span className="flex items-center">
-                                <Building2 className="h-3 w-3 mr-1" />
-                                {reservation.property.name}
+                                <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                                <span className="truncate max-w-[120px] sm:max-w-none">{reservation.property.name}</span>
                               </span>
                               <span className="flex items-center">
-                                <Users className="h-3 w-3 mr-1" />
-                                {reservation.numGuests} hospedes
+                                <Users className="h-3 w-3 mr-1 flex-shrink-0" />
+                                {reservation.numGuests}
                               </span>
                               <span className="flex items-center">
-                                <Calendar className="h-3 w-3 mr-1" />
+                                <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                                 {format(new Date(reservation.checkinDate), "dd/MM")} - {format(new Date(reservation.checkoutDate), "dd/MM")}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
+                        <div className="flex items-center justify-between sm:justify-end gap-4 pl-[76px] sm:pl-0">
+                          <div className="text-left sm:text-right">
                             <p className="font-semibold">
                               {new Intl.NumberFormat("pt-BR", {
                                 style: "currency",
