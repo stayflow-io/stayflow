@@ -124,12 +124,12 @@ export default async function TaskDetailPage({ params }: Props) {
                       <div key={item.id} className="flex items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={item.completed}
+                          checked={item.checked}
                           readOnly
                           className="h-4 w-4"
                         />
-                        <span className={item.completed ? "line-through text-muted-foreground" : ""}>
-                          {item.description}
+                        <span className={item.checked ? "line-through text-muted-foreground" : ""}>
+                          {item.item}
                         </span>
                       </div>
                     ))}

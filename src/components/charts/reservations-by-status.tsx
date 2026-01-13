@@ -13,6 +13,7 @@ interface StatusData {
   name: string
   value: number
   color: string
+  [key: string]: string | number
 }
 
 interface Props {
@@ -42,7 +43,7 @@ export function ReservationsByStatusChart({ data }: Props) {
             border: "1px solid hsl(var(--border))",
             borderRadius: "6px",
           }}
-          formatter={(value: number) => [value, "Reservas"]}
+          formatter={(value) => [value, "Reservas"]}
           labelStyle={{ color: "hsl(var(--foreground))" }}
         />
         <Legend

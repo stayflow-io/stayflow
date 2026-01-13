@@ -13,6 +13,7 @@ const roleMap = {
   ADMIN: { label: "Administrador", variant: "default" as const, color: "bg-purple-100 text-purple-700" },
   MANAGER: { label: "Gerente", variant: "secondary" as const, color: "bg-blue-100 text-blue-700" },
   OPERATOR: { label: "Operador", variant: "outline" as const, color: "bg-gray-100 text-gray-700" },
+  OWNER: { label: "Proprietario", variant: "outline" as const, color: "bg-green-100 text-green-700" },
 }
 
 export default async function UsersPage() {

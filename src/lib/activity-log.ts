@@ -78,7 +78,7 @@ export async function getActivityLogs(params?: {
   ])
 
   // Fetch user info for the logs
-  const userIds = [...new Set(items.map((i) => i.userId).filter(Boolean))]
+  const userIds = Array.from(new Set(items.map((i) => i.userId).filter(Boolean)))
   const users = await prisma.user.findMany({
     where: { id: { in: userIds as string[] } },
     select: { id: true, name: true, email: true },

@@ -44,7 +44,7 @@ export function OccupancyChart({ data }: Props) {
             border: "1px solid hsl(var(--border))",
             borderRadius: "6px",
           }}
-          formatter={(value: number) => [`${value.toFixed(1)}%`, "Ocupacao"]}
+          formatter={(value) => [`${Number(value).toFixed(1)}%`, "Ocupacao"]}
           labelStyle={{ color: "hsl(var(--foreground))" }}
         />
         <Bar

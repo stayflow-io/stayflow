@@ -106,10 +106,8 @@ export default function EditPropertyPage({ params }: { params: { id: string } })
       const result = await updateProperty(params.id, data)
       if (result.success) {
         router.push(`/properties/${params.id}`)
-      } else if (result.error) {
-        setError(result.error)
       }
-    } catch (err) {
+    } catch {
       setError("Erro ao atualizar imovel. Verifique os dados e tente novamente.")
     } finally {
       setIsLoading(false)

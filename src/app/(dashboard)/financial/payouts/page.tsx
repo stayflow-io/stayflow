@@ -20,6 +20,7 @@ const statusMap = {
   PENDING: { label: "Pendente", variant: "outline" as const },
   PROCESSING: { label: "Processando", variant: "secondary" as const },
   PAID: { label: "Pago", variant: "default" as const },
+  FAILED: { label: "Falhou", variant: "destructive" as const },
 }
 
 interface Props {
