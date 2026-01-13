@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import * as XLSX from "xlsx"
+import ExcelJS from "exceljs"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const startDate = searchParams.get("startDate")
   const endDate = searchParams.get("endDate")
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     tenantId: session.user.tenantId,
   }
@@ -46,24 +47,34 @@ export async function GET(request: Request) {
   }
 
   const data = reservations.map((r) => ({
-    "Hospede": r.guestName,
-    "Email": r.guestEmail || "",
-    "Telefone": r.guestPhone || "",
-    "Imovel": r.property.name,
-    "Check-in": format(new Date(r.checkinDate), "dd/MM/yyyy", { locale: ptBR }),
-    "Check-out": format(new Date(r.checkoutDate), "dd/MM/yyyy", { locale: ptBR }),
-    "Hospedes": r.numGuests,
-    "Status": statusMap[r.status] || r.status,
-    "Canal": r.channel?.name || "Direto",
-    "Valor Total": Number(r.totalAmount),
-    "Taxa Limpeza": Number(r.cleaningFee),
-    "Taxa Canal": Number(r.channelFee),
-    "Valor Liquido": Number(r.netAmount),
+    Hospede: r.guestName,
+    Email: r.guestEmail || "",
+    Telefone: r.guestPhone || "",
+    Imovel: r.property.name,
+    Checkin: format(new Date(r.checkinDate), "dd/MM/yyyy", { locale: ptBR }),
+    Checkout: format(new Date(r.checkoutDate), "dd/MM/yyyy", { locale: ptBR }),
+    Hospedes: r.numGuests,
+    Status: statusMap[r.status] || r.status,
+    Canal: r.channel?.name || "Direto",
+    ValorTotal: Number(r.totalAmount),
+    TaxaLimpeza: Number(r.cleaningFee),
+    TaxaCanal: Number(r.channelFee),
+    ValorLiquido: Number(r.netAmount),
   }))
 
   if (exportFormat === "csv") {
-    const ws = XLSX.utils.json_to_sheet(data)
-    const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" })
+    const headers = [
+      "Hospede", "Email", "Telefone", "Imovel", "Check-in", "Check-out",
+      "Hospedes", "Status", "Canal", "Valor Total", "Taxa Limpeza", "Taxa Canal", "Valor Liquido"
+    ]
+    const csvRows = [
+      headers.join(";"),
+      ...data.map((row) => [
+        row.Hospede, row.Email, row.Telefone, row.Imovel, row.Checkin, row.Checkout,
+        row.Hospedes, row.Status, row.Canal, row.ValorTotal, row.TaxaLimpeza, row.TaxaCanal, row.ValorLiquido
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(";")),
+    ]
+    const csv = csvRows.join("\n")
 
     return new NextResponse(csv, {
       headers: {
@@ -73,28 +84,35 @@ export async function GET(request: Request) {
     })
   }
 
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(data)
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet("Reservas")
 
-  // Set column widths
-  ws["!cols"] = [
-    { wch: 25 }, // Hospede
-    { wch: 30 }, // Email
-    { wch: 15 }, // Telefone
-    { wch: 25 }, // Imovel
-    { wch: 12 }, // Check-in
-    { wch: 12 }, // Check-out
-    { wch: 10 }, // Hospedes
-    { wch: 12 }, // Status
-    { wch: 15 }, // Canal
-    { wch: 12 }, // Valor Total
-    { wch: 12 }, // Taxa Limpeza
-    { wch: 12 }, // Taxa Canal
-    { wch: 12 }, // Valor Liquido
+  // Add headers
+  worksheet.columns = [
+    { header: "Hospede", key: "Hospede", width: 25 },
+    { header: "Email", key: "Email", width: 30 },
+    { header: "Telefone", key: "Telefone", width: 15 },
+    { header: "Imovel", key: "Imovel", width: 25 },
+    { header: "Check-in", key: "Checkin", width: 12 },
+    { header: "Check-out", key: "Checkout", width: 12 },
+    { header: "Hospedes", key: "Hospedes", width: 10 },
+    { header: "Status", key: "Status", width: 12 },
+    { header: "Canal", key: "Canal", width: 15 },
+    { header: "Valor Total", key: "ValorTotal", width: 12 },
+    { header: "Taxa Limpeza", key: "TaxaLimpeza", width: 12 },
+    { header: "Taxa Canal", key: "TaxaCanal", width: 12 },
+    { header: "Valor Liquido", key: "ValorLiquido", width: 12 },
   ]
 
-  XLSX.utils.book_append_sheet(wb, ws, "Reservas")
-  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
+  // Add data rows
+  data.forEach((row) => {
+    worksheet.addRow(row)
+  })
+
+  // Style header row
+  worksheet.getRow(1).font = { bold: true }
+
+  const buffer = await workbook.xlsx.writeBuffer()
 
   return new NextResponse(buffer, {
     headers: {

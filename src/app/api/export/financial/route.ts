@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-import * as XLSX from "xlsx"
+import ExcelJS from "exceljs"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const startDate = searchParams.get("startDate")
   const endDate = searchParams.get("endDate")
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     tenantId: session.user.tenantId,
   }
@@ -41,12 +42,12 @@ export async function GET(request: Request) {
   }
 
   const data = transactions.map((t) => ({
-    "Data": format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR }),
-    "Tipo": typeMap[t.type] || t.type,
-    "Categoria": t.category,
-    "Descricao": t.description || "",
-    "Imovel": t.property.name,
-    "Valor": t.type === "INCOME" ? Number(t.amount) : -Number(t.amount),
+    Data: format(new Date(t.date), "dd/MM/yyyy", { locale: ptBR }),
+    Tipo: typeMap[t.type] || t.type,
+    Categoria: t.category,
+    Descricao: t.description || "",
+    Imovel: t.property.name,
+    Valor: t.type === "INCOME" ? Number(t.amount) : -Number(t.amount),
   }))
 
   // Calculate totals
@@ -63,8 +64,14 @@ export async function GET(request: Request) {
   )
 
   if (exportFormat === "csv") {
-    const ws = XLSX.utils.json_to_sheet(data)
-    const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" })
+    const headers = ["Data", "Tipo", "Categoria", "Descricao", "Imovel", "Valor"]
+    const csvRows = [
+      headers.join(";"),
+      ...data.map((row) =>
+        headers.map((h) => `"${String(row[h as keyof typeof row]).replace(/"/g, '""')}"`).join(";")
+      ),
+    ]
+    const csv = csvRows.join("\n")
 
     return new NextResponse(csv, {
       headers: {
@@ -74,30 +81,35 @@ export async function GET(request: Request) {
     })
   }
 
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.json_to_sheet(data)
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet("Financeiro")
 
-  // Add summary at the end
-  const summaryData = [
-    {},
-    { "Data": "RESUMO", "Tipo": "", "Categoria": "", "Descricao": "", "Imovel": "", "Valor": "" },
-    { "Data": "Total Receitas", "Tipo": "", "Categoria": "", "Descricao": "", "Imovel": "", "Valor": totals.income },
-    { "Data": "Total Despesas", "Tipo": "", "Categoria": "", "Descricao": "", "Imovel": "", "Valor": -totals.expenses },
-    { "Data": "Lucro Liquido", "Tipo": "", "Categoria": "", "Descricao": "", "Imovel": "", "Valor": totals.income - totals.expenses },
+  // Add headers
+  worksheet.columns = [
+    { header: "Data", key: "Data", width: 12 },
+    { header: "Tipo", key: "Tipo", width: 10 },
+    { header: "Categoria", key: "Categoria", width: 20 },
+    { header: "Descricao", key: "Descricao", width: 30 },
+    { header: "Imovel", key: "Imovel", width: 25 },
+    { header: "Valor", key: "Valor", width: 15 },
   ]
 
-  // Set column widths
-  ws["!cols"] = [
-    { wch: 12 }, // Data
-    { wch: 10 }, // Tipo
-    { wch: 20 }, // Categoria
-    { wch: 30 }, // Descricao
-    { wch: 25 }, // Imovel
-    { wch: 15 }, // Valor
-  ]
+  // Add data rows
+  data.forEach((row) => {
+    worksheet.addRow(row)
+  })
 
-  XLSX.utils.book_append_sheet(wb, ws, "Financeiro")
-  const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
+  // Add summary
+  worksheet.addRow({})
+  worksheet.addRow({ Data: "RESUMO" })
+  worksheet.addRow({ Data: "Total Receitas", Valor: totals.income })
+  worksheet.addRow({ Data: "Total Despesas", Valor: -totals.expenses })
+  worksheet.addRow({ Data: "Lucro Liquido", Valor: totals.income - totals.expenses })
+
+  // Style header row
+  worksheet.getRow(1).font = { bold: true }
+
+  const buffer = await workbook.xlsx.writeBuffer()
 
   return new NextResponse(buffer, {
     headers: {
