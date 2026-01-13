@@ -45,8 +45,8 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Configuracoes</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold">Configuracoes</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Gerencie as configuracoes da sua conta
         </p>
       </div>
@@ -142,25 +142,25 @@ export default async function SettingsPage() {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="flex items-center justify-between p-4 border rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg gap-3"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                       <span className="text-primary font-medium">
                         {user.name.charAt(0).toUpperCase()}
                       </span>
                     </div>
-                    <div>
-                      <p className="font-medium flex items-center gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium flex items-center gap-2 truncate">
                         {user.name}
                         {user.id === session.user.id && (
                           <span className="text-xs text-muted-foreground">(voce)</span>
                         )}
                       </p>
-                      <p className="text-sm text-muted-foreground">{user.email}</p>
+                      <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 pl-[52px] sm:pl-0">
                     {user.phone && (
                       <span className="text-sm text-muted-foreground hidden md:block">
                         {user.phone}

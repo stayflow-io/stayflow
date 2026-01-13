@@ -45,14 +45,14 @@ export default async function PayoutsPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Repasses</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Repasses</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie pagamentos aos proprietarios
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/financial/payouts/new">
             <Plus className="h-4 w-4 mr-2" />
             Novo Repasse
@@ -111,21 +111,23 @@ export default async function PayoutsPage({ searchParams }: Props) {
                 const status = statusMap[payout.status]
                 return (
                   <Link key={payout.id} href={`/financial/payouts/${payout.id}`}>
-                    <div className="flex items-center justify-between p-4 border rounded-lg hover:shadow-md transition-shadow">
-                      <div className="flex items-center gap-4">
-                        <div className="p-2 bg-muted rounded-full">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:shadow-md transition-shadow gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="p-2 bg-muted rounded-full flex-shrink-0">
                           <User className="h-4 w-4" />
                         </div>
-                        <div>
-                          <p className="font-medium">{payout.owner.name}</p>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(payout.periodStart), "dd/MM", { locale: ptBR })} - {format(new Date(payout.periodEnd), "dd/MM/yyyy", { locale: ptBR })}
+                        <div className="min-w-0">
+                          <p className="font-medium truncate">{payout.owner.name}</p>
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                            <Calendar className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">
+                              {format(new Date(payout.periodStart), "dd/MM", { locale: ptBR })} - {format(new Date(payout.periodEnd), "dd/MM/yyyy", { locale: ptBR })}
+                            </span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
+                      <div className="flex items-center justify-between sm:justify-end gap-4 pl-[44px] sm:pl-0">
+                        <div className="text-left sm:text-right">
                           <p className="font-semibold text-green-600">
                             {formatCurrency(Number(payout.netAmount))}
                           </p>

@@ -49,14 +49,14 @@ export default async function TasksPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Tarefas</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Tarefas</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie limpezas e manutencoes
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/tasks/new">
             <Plus className="h-4 w-4 mr-2" />
             Nova Tarefa
@@ -92,46 +92,48 @@ export default async function TasksPage({ searchParams }: Props) {
               return (
                 <Card key={task.id} className={`hover:shadow-md transition-shadow ${isCompleted ? "opacity-60" : ""}`}>
                   <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        {isCompleted ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
-                        ) : (
-                          <TaskStatusButton taskId={task.id} currentStatus={task.status} />
-                        )}
-                        <Link href={`/tasks/${task.id}`} className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className={`font-semibold hover:underline ${isCompleted ? "line-through" : ""}`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                        <div className="mt-1 sm:mt-0">
+                          {isCompleted ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : (
+                            <TaskStatusButton taskId={task.id} currentStatus={task.status} />
+                          )}
+                        </div>
+                        <Link href={`/tasks/${task.id}`} className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className={`font-semibold hover:underline truncate ${isCompleted ? "line-through" : ""}`}>
                               {task.title}
                             </p>
-                            <span className={`text-xs px-2 py-0.5 rounded ${type.color}`}>
+                            <span className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${type.color}`}>
                               {type.label}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground mt-1">
                             <span className="flex items-center">
-                              <Building2 className="h-3 w-3 mr-1" />
-                              {task.property.name}
+                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                              <span className="truncate max-w-[100px] sm:max-w-none">{task.property.name}</span>
                             </span>
                             <span className="flex items-center">
-                              <Calendar className="h-3 w-3 mr-1" />
+                              <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />
                               {format(new Date(task.scheduledDate), "dd/MM/yyyy", { locale: ptBR })}
                             </span>
                             {task.assignedTo && (
                               <span className="flex items-center">
-                                <User className="h-3 w-3 mr-1" />
-                                {task.assignedTo.name}
+                                <User className="h-3 w-3 mr-1 flex-shrink-0" />
+                                <span className="truncate max-w-[80px] sm:max-w-none">{task.assignedTo.name}</span>
                               </span>
                             )}
                             {isCompleted && task.completedAt && (
-                              <span>
+                              <span className="whitespace-nowrap">
                                 Concluida em {format(new Date(task.completedAt), "dd/MM", { locale: ptBR })}
                               </span>
                             )}
                           </div>
                         </Link>
                       </div>
-                      <Badge variant={status.variant}>{status.label}</Badge>
+                      <Badge variant={status.variant} className="self-start sm:self-center">{status.label}</Badge>
                     </div>
                   </CardContent>
                 </Card>

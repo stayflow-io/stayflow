@@ -25,20 +25,20 @@ export default async function FinancialPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Financeiro</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Financeiro</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Controle receitas e despesas - {format(now, "MMMM yyyy", { locale: ptBR })}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
+          <Button variant="outline" asChild className="flex-1 sm:flex-none">
             <Link href="/financial/payouts">
               Repasses
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="flex-1 sm:flex-none">
             <Link href="/financial/new">
               <Plus className="h-4 w-4 mr-2" />
               Nova Transacao
@@ -100,10 +100,10 @@ export default async function FinancialPage() {
               {transactions.slice(0, 20).map((transaction) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-3"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`p-2 rounded-full flex-shrink-0 ${
                       transaction.type === "INCOME"
                         ? "bg-green-100 text-green-600"
                         : "bg-red-100 text-red-600"
@@ -114,18 +114,20 @@ export default async function FinancialPage() {
                         <TrendingDown className="h-4 w-4" />
                       )}
                     </div>
-                    <div>
-                      <p className="font-medium">{transaction.category}</p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Building2 className="h-3 w-3" />
-                        {transaction.property.name}
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{transaction.category}</p>
+                      <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <span className="flex items-center">
+                          <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
+                          <span className="truncate max-w-[100px] sm:max-w-[150px]">{transaction.property.name}</span>
+                        </span>
                         {transaction.description && (
-                          <span>- {transaction.description}</span>
+                          <span className="truncate max-w-[120px] sm:max-w-none">- {transaction.description}</span>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right pl-11 sm:pl-0 flex-shrink-0">
                     <p className={`font-semibold ${
                       transaction.type === "INCOME" ? "text-green-600" : "text-red-600"
                     }`}>
