@@ -75,7 +75,7 @@ export default async function ReservationsPage({ searchParams }: Props) {
             {reservations.map((reservation) => {
               const status = statusMap[reservation.status]
               return (
-                <Link key={reservation.id} href={`/reservations/${reservation.id}`}>
+                <Link key={reservation.id} href={`/reservations/${reservation.id}`} className="block">
                   <Card className="hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

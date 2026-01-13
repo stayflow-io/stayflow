@@ -9,14 +9,14 @@ export default async function OwnersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Proprietarios</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold">Proprietarios</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Gerencie os proprietarios dos imoveis
           </p>
         </div>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/owners/new">
             <Plus className="h-4 w-4 mr-2" />
             Novo Proprietario
