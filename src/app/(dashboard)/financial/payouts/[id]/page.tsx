@@ -39,29 +39,31 @@ export default async function PayoutDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
             <Link href="/financial/payouts">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">Repasse</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold">Repasse</h1>
               <Badge variant={status.variant}>{status.label}</Badge>
             </div>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <User className="h-4 w-4 mr-1" />
-              {payout.owner.name}
+            <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
+              <User className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">{payout.owner.name}</span>
             </div>
           </div>
         </div>
-        <PayoutActions
-          payoutId={payout.id}
-          currentStatus={payout.status}
-          ownerName={payout.owner.name}
-        />
+        <div className="pl-14 sm:pl-0">
+          <PayoutActions
+            payoutId={payout.id}
+            currentStatus={payout.status}
+            ownerName={payout.owner.name}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

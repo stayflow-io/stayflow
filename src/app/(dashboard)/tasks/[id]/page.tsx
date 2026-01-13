@@ -40,32 +40,34 @@ export default async function TaskDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
             <Link href="/tasks">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{task.title}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold truncate">{task.title}</h1>
               <Badge variant={status.variant}>{status.label}</Badge>
-              <span className={`text-sm px-2 py-0.5 rounded ${type.color}`}>
+              <span className={`text-xs sm:text-sm px-2 py-0.5 rounded ${type.color}`}>
                 {type.label}
               </span>
             </div>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <Building2 className="h-4 w-4 mr-1" />
-              {task.property.name}
+            <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
+              <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">{task.property.name}</span>
             </div>
           </div>
         </div>
-        <TaskActions
-          taskId={task.id}
-          currentStatus={task.status}
-          taskTitle={task.title}
-        />
+        <div className="pl-14 sm:pl-0">
+          <TaskActions
+            taskId={task.id}
+            currentStatus={task.status}
+            taskTitle={task.title}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

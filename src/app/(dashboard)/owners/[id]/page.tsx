@@ -21,22 +21,24 @@ export default async function OwnerDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
             <Link href="/owners">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold">{owner.name}</h1>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <Building2 className="h-4 w-4 mr-1" />
+          <div className="min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-bold truncate">{owner.name}</h1>
+            <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
+              <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
               {owner.properties.length} {owner.properties.length === 1 ? "imovel" : "imoveis"}
             </div>
           </div>
         </div>
-        <OwnerActions ownerId={owner.id} ownerName={owner.name} />
+        <div className="pl-14 sm:pl-0">
+          <OwnerActions ownerId={owner.id} ownerName={owner.name} />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">

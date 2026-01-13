@@ -38,29 +38,31 @@ export default async function ReservationDetailPage({ params }: Props) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="flex-shrink-0">
             <Link href="/reservations">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">{reservation.guestName}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold truncate">{reservation.guestName}</h1>
               <Badge variant={status.variant}>{status.label}</Badge>
             </div>
-            <div className="flex items-center text-muted-foreground mt-1">
-              <Building2 className="h-4 w-4 mr-1" />
-              {reservation.property.name}
+            <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
+              <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">{reservation.property.name}</span>
             </div>
           </div>
         </div>
-        <ReservationActions
-          reservationId={reservation.id}
-          currentStatus={reservation.status}
-          guestName={reservation.guestName}
-        />
+        <div className="pl-14 sm:pl-0">
+          <ReservationActions
+            reservationId={reservation.id}
+            currentStatus={reservation.status}
+            guestName={reservation.guestName}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
