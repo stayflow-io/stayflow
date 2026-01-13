@@ -183,8 +183,37 @@ async function main() {
 
   console.log("🏠 Criando proprietarios...")
 
+  // Criar usuário proprietário com login
+  const ownerUser = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      email: "proprietario@stayflow.com",
+      name: "Pedro Silva",
+      passwordHash: await hash("123456", 10),
+      role: "OWNER",
+      phone: "(11) 99999-5555",
+    },
+  })
+
   const owners: Array<{ id: string; name: string }> = []
-  for (let i = 0; i < 10; i++) {
+
+  // Primeiro proprietário vinculado ao usuário com login
+  const firstOwner = await prisma.owner.create({
+    data: {
+      tenantId: tenant.id,
+      userId: ownerUser.id,
+      name: "Pedro Silva",
+      email: "proprietario@stayflow.com",
+      phone: "(11) 99999-5555",
+      document: "123.456.789-00",
+      pixKey: "proprietario@stayflow.com",
+      commissionPercent: 80,
+    },
+  })
+  owners.push(firstOwner)
+
+  // Demais proprietários sem login
+  for (let i = 1; i < 10; i++) {
     const firstName = firstNames[i]
     const lastName = lastNames[i]
     const name = `${firstName} ${lastName}`
@@ -553,9 +582,10 @@ async function main() {
   console.log(`   📈 TOTAL: ${total} registros`)
   console.log("")
   console.log("🔑 Credenciais de acesso:")
-  console.log("   Admin:    admin@stayflow.com    / 123456")
-  console.log("   Gerente:  gerente@stayflow.com  / 123456")
-  console.log("   Operador: operador@stayflow.com / 123456")
+  console.log("   Admin:        admin@stayflow.com        / 123456")
+  console.log("   Gerente:      gerente@stayflow.com      / 123456")
+  console.log("   Operador:     operador@stayflow.com     / 123456")
+  console.log("   Proprietario: proprietario@stayflow.com / 123456")
 }
 
 main()

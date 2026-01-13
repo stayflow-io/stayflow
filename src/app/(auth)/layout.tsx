@@ -13,7 +13,7 @@ export default function AuthLayout({
             backgroundImage: "url('https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop')",
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/90 to-primary/70" />
+        <div className="absolute inset-0 bg-gradient-to-br from-zinc-900/90 to-zinc-800/70" />
         <div className="relative z-10 flex flex-col justify-between p-12 text-white">
           <div>
             <h1 className="text-4xl font-bold">StayFlow</h1>

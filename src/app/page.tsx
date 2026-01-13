@@ -57,7 +57,7 @@ export default async function Home() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link
                 href="/register"
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-6 py-3 text-lg font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-6 py-3 text-lg font-medium text-zinc-900 hover:bg-zinc-100 transition-colors"
               >
                 Comecar agora
                 <ArrowRight className="h-5 w-5" />
@@ -94,7 +94,7 @@ export default async function Home() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="p-6 rounded-xl border bg-card hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-blue-500/10 text-blue-500 dark:bg-blue-500/20 dark:text-blue-400 flex items-center justify-center mb-4">
                 <Building2 className="h-6 w-6" />
               </div>
               <h4 className="text-xl font-semibold mb-2">Gestao de Imoveis</h4>
@@ -104,7 +104,7 @@ export default async function Home() {
             </div>
 
             <div className="p-6 rounded-xl border bg-card hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 rounded-lg bg-green-100 text-green-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-green-500/10 text-green-500 dark:bg-green-500/20 dark:text-green-400 flex items-center justify-center mb-4">
                 <Calendar className="h-6 w-6" />
               </div>
               <h4 className="text-xl font-semibold mb-2">Calendario Integrado</h4>
@@ -114,7 +114,7 @@ export default async function Home() {
             </div>
 
             <div className="p-6 rounded-xl border bg-card hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 rounded-lg bg-yellow-100 text-yellow-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-yellow-500/10 text-yellow-500 dark:bg-yellow-500/20 dark:text-yellow-400 flex items-center justify-center mb-4">
                 <DollarSign className="h-6 w-6" />
               </div>
               <h4 className="text-xl font-semibold mb-2">Controle Financeiro</h4>
@@ -124,7 +124,7 @@ export default async function Home() {
             </div>
 
             <div className="p-6 rounded-xl border bg-card hover:shadow-lg transition-shadow">
-              <div className="w-12 h-12 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center mb-4">
+              <div className="w-12 h-12 rounded-lg bg-purple-500/10 text-purple-500 dark:bg-purple-500/20 dark:text-purple-400 flex items-center justify-center mb-4">
                 <Users className="h-6 w-6" />
               </div>
               <h4 className="text-xl font-semibold mb-2">Multi-proprietarios</h4>
@@ -146,28 +146,28 @@ export default async function Home() {
               </h3>
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h5 className="font-semibold">Economize tempo</h5>
                     <p className="text-muted-foreground">Automatize tarefas repetitivas e foque no que importa</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h5 className="font-semibold">Evite conflitos de reserva</h5>
                     <p className="text-muted-foreground">Calendario unificado com bloqueios automaticos</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h5 className="font-semibold">Transparencia financeira</h5>
                     <p className="text-muted-foreground">Relatorios detalhados para voce e seus proprietarios</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
-                  <CheckCircle className="h-6 w-6 text-green-500 flex-shrink-0 mt-0.5" />
+                  <CheckCircle className="h-6 w-6 text-green-500 dark:text-green-400 flex-shrink-0 mt-0.5" />
                   <div>
                     <h5 className="font-semibold">Acesso de qualquer lugar</h5>
                     <p className="text-muted-foreground">Plataforma 100% online e responsiva</p>
@@ -188,17 +188,17 @@ export default async function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-primary text-primary-foreground">
+      <section className="py-24 bg-zinc-900 dark:bg-zinc-800 text-white">
         <div className="max-w-4xl mx-auto px-6 text-center">
           <h3 className="text-3xl md:text-4xl font-bold mb-4">
             Pronto para simplificar sua gestao?
           </h3>
-          <p className="text-xl opacity-90 mb-8">
+          <p className="text-xl text-zinc-300 mb-8">
             Crie sua conta gratuitamente e comece a gerenciar seus imoveis hoje mesmo
           </p>
           <Link
             href="/register"
-            className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-8 py-4 text-lg font-medium text-primary hover:bg-white/90 transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-white px-8 py-4 text-lg font-medium text-zinc-900 hover:bg-zinc-100 transition-colors"
           >
             Criar conta gratuita
             <ArrowRight className="h-5 w-5" />
