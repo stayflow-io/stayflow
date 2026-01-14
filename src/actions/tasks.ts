@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { taskSchema, taskUpdateSchema } from "@/lib/validations/task"
+import { cache, cacheKeys } from "@/lib/redis"
 
 const ITEMS_PER_PAGE = 20
 
@@ -112,6 +113,9 @@ export async function createTask(formData: FormData) {
     },
   })
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+
   revalidatePath("/tasks")
   return { success: true, id: task.id }
 }
@@ -146,6 +150,9 @@ export async function updateTask(id: string, formData: FormData) {
     data: updateData,
   })
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+
   revalidatePath("/tasks")
   return { success: true }
 }
@@ -162,6 +169,9 @@ export async function completeTask(id: string) {
     },
   })
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+
   revalidatePath("/tasks")
   return { success: true }
 }
@@ -173,6 +183,9 @@ export async function deleteTask(id: string) {
   await prisma.task.delete({
     where: { id, tenantId: session.user.tenantId },
   })
+
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
 
   revalidatePath("/tasks")
   return { success: true }

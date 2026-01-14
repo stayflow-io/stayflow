@@ -13,7 +13,7 @@ import Link from "next/link"
 type Property = {
   id: string
   name: string
-  ownerId: string
+  ownerId: string | null
 }
 
 type Owner = {

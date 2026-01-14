@@ -4,21 +4,41 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { ownerSchema, ownerUpdateSchema } from "@/lib/validations/owner"
+import { cache, cacheKeys, TTL } from "@/lib/redis"
 
-export async function getOwners() {
+type OwnerWithCount = {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  _count: { properties: number }
+  [key: string]: unknown
+}
+
+export async function getOwners(): Promise<OwnerWithCount[]> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  return prisma.owner.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      deletedAt: null,
+  const tenantId = session.user.tenantId
+
+  return cache.getOrSet<OwnerWithCount[]>(
+    cacheKeys.owners(tenantId),
+    async () => {
+      const owners = await prisma.owner.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+        },
+        include: {
+          _count: { select: { properties: true } },
+        },
+        orderBy: { name: "asc" },
+      })
+      // Serializar para evitar problemas com Dates
+      return JSON.parse(JSON.stringify(owners))
     },
-    include: {
-      _count: { select: { properties: true } },
-    },
-    orderBy: { name: "asc" },
-  })
+    TTL.MEDIUM
+  )
 }
 
 export async function getOwner(id: string) {
@@ -80,6 +100,9 @@ export async function createOwner(formData: FormData) {
     },
   })
 
+  // Invalidar cache
+  await cache.del(cacheKeys.owners(session.user.tenantId))
+
   revalidatePath("/owners")
   return { success: true, id: owner.id }
 }
@@ -121,6 +144,10 @@ export async function updateOwner(id: string, formData: FormData) {
     data: validated.data,
   })
 
+  // Invalidar cache
+  await cache.del(cacheKeys.owners(session.user.tenantId))
+  await cache.del(cacheKeys.owner(id))
+
   revalidatePath("/owners")
   revalidatePath(`/owners/${id}`)
   return { success: true }
@@ -146,6 +173,10 @@ export async function deleteOwner(id: string) {
     where: { id, tenantId: session.user.tenantId },
     data: { deletedAt: new Date() },
   })
+
+  // Invalidar cache
+  await cache.del(cacheKeys.owners(session.user.tenantId))
+  await cache.del(cacheKeys.owner(id))
 
   revalidatePath("/owners")
   return { success: true }

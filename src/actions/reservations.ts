@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { reservationSchema } from "@/lib/validations/reservation"
+import { cache, cacheKeys } from "@/lib/redis"
 
 const ITEMS_PER_PAGE = 15
 
@@ -118,6 +119,11 @@ export async function createReservation(formData: FormData) {
     },
   })
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
+  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+
   revalidatePath("/reservations")
   revalidatePath("/calendar")
   return { success: true, id: reservation.id }
@@ -168,6 +174,11 @@ export async function updateReservation(id: string, formData: FormData) {
     },
   })
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
+  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+
   revalidatePath("/reservations")
   revalidatePath(`/reservations/${id}`)
   revalidatePath("/calendar")
@@ -205,6 +216,11 @@ export async function updateReservationStatus(id: string, status: string) {
     })
   }
 
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
+  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+
   revalidatePath("/reservations")
   revalidatePath(`/reservations/${id}`)
   revalidatePath("/tasks")
@@ -218,6 +234,11 @@ export async function deleteReservation(id: string) {
   await prisma.reservation.delete({
     where: { id, tenantId: session.user.tenantId },
   })
+
+  // Invalidar cache do dashboard
+  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
+  await cache.del(cacheKeys.occupancy(session.user.tenantId))
 
   revalidatePath("/reservations")
   revalidatePath("/calendar")

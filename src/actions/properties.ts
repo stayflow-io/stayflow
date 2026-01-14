@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { propertySchema } from "@/lib/validations/property"
 import { revalidatePath } from "next/cache"
+import { cache, cacheKeys, TTL } from "@/lib/redis"
 
 export async function createProperty(data: any) {
   const session = await auth()
@@ -17,6 +18,9 @@ export async function createProperty(data: any) {
       tenantId: session.user.tenantId,
     },
   })
+
+  // Invalidar cache
+  await cache.del(cacheKeys.properties(session.user.tenantId))
 
   revalidatePath("/dashboard/properties")
   return { success: true, id: property.id }
@@ -69,17 +73,35 @@ export async function getProperties(filters?: {
   }
 }
 
-export async function getAllProperties() {
+type PropertyBasic = {
+  id: string
+  name: string
+  ownerId: string | null
+  maxGuests: number
+  cleaningFee: number | string
+  [key: string]: unknown
+}
+
+export async function getAllProperties(): Promise<PropertyBasic[]> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  return prisma.property.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      deletedAt: null,
+  const tenantId = session.user.tenantId
+
+  return cache.getOrSet<PropertyBasic[]>(
+    cacheKeys.properties(tenantId),
+    async () => {
+      const properties = await prisma.property.findMany({
+        where: {
+          tenantId,
+          deletedAt: null,
+        },
+        orderBy: { name: "asc" },
+      })
+      return JSON.parse(JSON.stringify(properties))
     },
-    orderBy: { name: "asc" },
-  })
+    TTL.MEDIUM
+  )
 }
 
 export async function getPropertyById(id: string) {
@@ -107,6 +129,10 @@ export async function updateProperty(id: string, data: any) {
     data: validated,
   })
 
+  // Invalidar cache
+  await cache.del(cacheKeys.properties(session.user.tenantId))
+  await cache.del(cacheKeys.property(id))
+
   revalidatePath("/dashboard/properties")
   return { success: true, id: property.id }
 }
@@ -119,6 +145,10 @@ export async function deleteProperty(id: string) {
     where: { id, tenantId: session.user.tenantId },
     data: { deletedAt: new Date() },
   })
+
+  // Invalidar cache
+  await cache.del(cacheKeys.properties(session.user.tenantId))
+  await cache.del(cacheKeys.property(id))
 
   revalidatePath("/dashboard/properties")
   return { success: true }

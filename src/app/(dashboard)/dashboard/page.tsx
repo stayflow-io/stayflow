@@ -295,7 +295,7 @@ export default async function DashboardPage() {
                     <div>
                       <p className="font-medium">{task.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {task.property.name}
+                        {task.property?.name || "Sem imóvel"}
                       </p>
                     </div>
                     <div className="text-right">
