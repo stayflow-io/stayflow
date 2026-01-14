@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { createProperty } from "@/actions/properties"
 import { getOwners } from "@/actions/owners"
+import { useToast } from "@/hooks/use-toast"
 
 const ESTADOS_BR = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA",
@@ -32,6 +33,7 @@ type Owner = {
 
 export default function NewPropertyPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [owners, setOwners] = useState<Owner[]>([])
@@ -67,10 +69,19 @@ export default function NewPropertyPage() {
     try {
       const result = await createProperty(data)
       if (result.success) {
+        toast({
+          title: "Imovel criado",
+          description: "O imovel foi cadastrado com sucesso.",
+        })
         router.push("/properties")
       }
     } catch (err) {
       setError("Erro ao criar imovel. Verifique os dados e tente novamente.")
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel criar o imovel.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }

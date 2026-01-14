@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { createReservation } from "@/actions/reservations"
 import { getAllProperties } from "@/actions/properties"
+import { useToast } from "@/hooks/use-toast"
 
 type Property = {
   id: string
@@ -22,6 +23,7 @@ type Property = {
 
 export default function NewReservationPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
@@ -41,12 +43,26 @@ export default function NewReservationPage() {
     try {
       const result = await createReservation(formData)
       if (result.success) {
+        toast({
+          title: "Reserva criada",
+          description: "A reserva foi cadastrada com sucesso.",
+        })
         router.push("/reservations")
       } else if (result.error) {
         setError(result.error)
+        toast({
+          title: "Erro",
+          description: result.error,
+          variant: "destructive",
+        })
       }
     } catch (err) {
       setError("Erro ao criar reserva. Verifique os dados e tente novamente.")
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel criar a reserva.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }

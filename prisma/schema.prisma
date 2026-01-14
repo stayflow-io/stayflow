@@ -105,6 +105,9 @@ model Property {
   calendarBlocks CalendarBlock[]
   tasks          Task[]
   transactions   Transaction[]
+
+  @@index([tenantId, status])
+  @@index([ownerId])
 }
 
 enum PropertyStatus {
@@ -163,6 +166,27 @@ model CalendarBlock {
   property Property @relation(fields: [propertyId], references: [id])
 }
 
+// ==================== GUESTS ====================
+
+model Guest {
+  id           String    @id @default(cuid())
+  tenantId     String
+  name         String
+  email        String?
+  phone        String?
+  document     String?   // CPF/Passport
+  notes        String?
+  isBlocked    Boolean   @default(false) // DNR list
+  blockReason  String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  reservations Reservation[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, name])
+}
+
 // ==================== RESERVATIONS ====================
 
 model Reservation {
@@ -170,6 +194,7 @@ model Reservation {
   tenantId              String
   propertyId            String
   channelId             String?
+  guestId               String?
   externalReservationId String?
   guestName             String
   guestEmail            String?
@@ -189,10 +214,16 @@ model Reservation {
   tenant       Tenant             @relation(fields: [tenantId], references: [id])
   property     Property           @relation(fields: [propertyId], references: [id])
   channel      Channel?           @relation(fields: [channelId], references: [id])
+  guest        Guest?             @relation(fields: [guestId], references: [id])
   events       ReservationEvent[]
   tasks        Task[]
   transactions Transaction[]
   messages     MessageLog[]
+
+  @@index([tenantId, checkinDate])
+  @@index([tenantId, status])
+  @@index([propertyId, checkinDate])
+  @@index([guestId])
 }
 
 enum ReservationStatus {
@@ -218,26 +249,59 @@ model ReservationEvent {
 // ==================== OPERATIONS ====================
 
 model Task {
-  id            String     @id @default(cuid())
-  tenantId      String
-  propertyId    String
-  reservationId String?
-  type          TaskType
-  title         String
-  description   String?
-  assignedToId  String?
-  status        TaskStatus @default(PENDING)
-  scheduledDate DateTime
-  completedAt   DateTime?
-  notes         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                  String     @id @default(cuid())
+  tenantId            String
+  propertyId          String
+  reservationId       String?
+  recurringTemplateId String?
+  type                TaskType
+  title               String
+  description         String?
+  assignedToId        String?
+  status              TaskStatus @default(PENDING)
+  scheduledDate       DateTime
+  completedAt         DateTime?
+  notes               String?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  tenant      Tenant          @relation(fields: [tenantId], references: [id])
-  property    Property        @relation(fields: [propertyId], references: [id])
-  reservation Reservation?    @relation(fields: [reservationId], references: [id])
-  assignedTo  User?           @relation(fields: [assignedToId], references: [id])
-  checklist   TaskChecklist[]
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  property          Property           @relation(fields: [propertyId], references: [id])
+  reservation       Reservation?       @relation(fields: [reservationId], references: [id])
+  assignedTo        User?              @relation(fields: [assignedToId], references: [id])
+  recurringTemplate RecurringTask?     @relation(fields: [recurringTemplateId], references: [id])
+  checklist         TaskChecklist[]
+
+  @@index([tenantId, scheduledDate])
+  @@index([tenantId, status])
+}
+
+model RecurringTask {
+  id             String              @id @default(cuid())
+  tenantId       String
+  propertyId     String?             // null = all properties
+  type           TaskType
+  title          String
+  description    String?
+  assignedToId   String?
+  frequency      RecurringFrequency
+  dayOfWeek      Int?                // 0-6 for weekly
+  dayOfMonth     Int?                // 1-31 for monthly
+  active         Boolean             @default(true)
+  lastGeneratedAt DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  generatedTasks Task[]
+
+  @@index([tenantId, active])
+}
+
+enum RecurringFrequency {
+  DAILY
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
 }
 
 enum TaskType {
@@ -365,6 +429,9 @@ model OwnerPayout {
   updatedAt   DateTime     @updatedAt
 
   owner Owner @relation(fields: [ownerId], references: [id])
+
+  @@unique([ownerId, periodStart, periodEnd])
+  @@index([ownerId, status])
 }
 
 enum PayoutStatus {

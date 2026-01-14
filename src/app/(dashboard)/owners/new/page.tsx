@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { createOwner } from "@/actions/owners"
+import { useToast } from "@/hooks/use-toast"
 
 export default function NewOwnerPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -25,12 +27,26 @@ export default function NewOwnerPage() {
     try {
       const result = await createOwner(formData)
       if (result.success) {
+        toast({
+          title: "Proprietario criado",
+          description: "O proprietario foi cadastrado com sucesso.",
+        })
         router.push("/owners")
       } else if (result.error) {
         setError(result.error)
+        toast({
+          title: "Erro",
+          description: result.error,
+          variant: "destructive",
+        })
       }
     } catch (err) {
       setError("Erro ao criar proprietario. Verifique os dados e tente novamente.")
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel criar o proprietario.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }

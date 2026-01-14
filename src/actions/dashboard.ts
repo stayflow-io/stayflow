@@ -125,26 +125,47 @@ export async function getRevenueByMonth() {
 
   const tenantId = session.user.tenantId
   const now = new Date()
-  const months: { month: string; revenue: number }[] = []
+
+  // Buscar período de 6 meses em uma única query
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+  const reservations = await prisma.reservation.findMany({
+    where: {
+      tenantId,
+      checkinDate: { gte: sixMonthsAgo, lte: endOfCurrentMonth },
+      status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+    },
+    select: {
+      checkinDate: true,
+      totalAmount: true,
+    },
+  })
+
+  // Agrupar por mês no JavaScript
+  const revenueByMonth = new Map<string, number>()
 
   for (let i = 5; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1)
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+    const key = `${date.getFullYear()}-${date.getMonth()}`
+    revenueByMonth.set(key, 0)
+  }
 
-    const revenue = await prisma.reservation.aggregate({
-      where: {
-        tenantId,
-        checkinDate: { gte: startOfMonth, lte: endOfMonth },
-        status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
-      },
-      _sum: { totalAmount: true },
-    })
+  for (const reservation of reservations) {
+    const date = new Date(reservation.checkinDate)
+    const key = `${date.getFullYear()}-${date.getMonth()}`
+    const current = revenueByMonth.get(key) || 0
+    revenueByMonth.set(key, current + Number(reservation.totalAmount))
+  }
 
+  const months: { month: string; revenue: number }[] = []
+  for (let i = 5; i >= 0; i--) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const key = `${date.getFullYear()}-${date.getMonth()}`
     const monthName = date.toLocaleDateString("pt-BR", { month: "short" })
     months.push({
       month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-      revenue: revenue._sum.totalAmount?.toNumber() || 0,
+      revenue: revenueByMonth.get(key) || 0,
     })
   }
 

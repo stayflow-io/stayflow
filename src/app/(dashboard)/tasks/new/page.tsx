@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { createTask } from "@/actions/tasks"
 import { getAllProperties } from "@/actions/properties"
+import { useToast } from "@/hooks/use-toast"
 
 type Property = {
   id: string
@@ -27,6 +28,7 @@ const TASK_TYPES = [
 
 export default function NewTaskPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
@@ -45,12 +47,26 @@ export default function NewTaskPage() {
     try {
       const result = await createTask(formData)
       if (result.success) {
+        toast({
+          title: "Tarefa criada",
+          description: "A tarefa foi agendada com sucesso.",
+        })
         router.push("/tasks")
       } else if (result.error) {
         setError(result.error)
+        toast({
+          title: "Erro",
+          description: result.error,
+          variant: "destructive",
+        })
       }
     } catch (err) {
       setError("Erro ao criar tarefa. Verifique os dados e tente novamente.")
+      toast({
+        title: "Erro",
+        description: "Nao foi possivel criar a tarefa.",
+        variant: "destructive",
+      })
     } finally {
       setIsLoading(false)
     }
