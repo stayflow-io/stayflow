@@ -87,12 +87,12 @@ export function EditUnitForm({ unit, owners }: Props) {
 
         <div className="space-y-2">
           <Label htmlFor="ownerId">Proprietario</Label>
-          <Select name="ownerId" defaultValue={unit.ownerId || ""}>
+          <Select name="ownerId" defaultValue={unit.ownerId || "inherit"}>
             <SelectTrigger>
-              <SelectValue placeholder="Herdar do imovel" />
+              <SelectValue placeholder="Selecione o proprietario" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Herdar do imovel</SelectItem>
+              <SelectItem value="inherit">Herdar do imovel</SelectItem>
               {owners.map((owner) => (
                 <SelectItem key={owner.id} value={owner.id}>
                   {owner.name}
@@ -101,7 +101,7 @@ export function EditUnitForm({ unit, owners }: Props) {
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Deixe vazio para usar o proprietario do imovel
+            Selecione &quot;Herdar do imovel&quot; para usar o proprietario padrao
           </p>
         </div>
 

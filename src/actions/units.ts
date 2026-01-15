@@ -173,9 +173,10 @@ export async function createUnit(propertyId: string, formData: FormData) {
     return { error: "Propriedade nao encontrada" }
   }
 
+  const ownerIdValue = formData.get("ownerId") as string
   const data = {
     propertyId,
-    ownerId: (formData.get("ownerId") as string) || null,
+    ownerId: ownerIdValue && ownerIdValue !== "inherit" ? ownerIdValue : null,
     name: formData.get("name") as string,
     bedrooms: Number(formData.get("bedrooms")),
     bathrooms: Number(formData.get("bathrooms")),
@@ -221,11 +222,12 @@ export async function updateUnit(id: string, formData: FormData) {
   }
 
   const statusValue = formData.get("status") as string | null
+  const ownerIdValue = formData.get("ownerId") as string
 
   await prisma.unit.update({
     where: { id },
     data: {
-      ownerId: (formData.get("ownerId") as string) || null,
+      ownerId: ownerIdValue && ownerIdValue !== "inherit" ? ownerIdValue : null,
       name: formData.get("name") as string,
       bedrooms: Number(formData.get("bedrooms")),
       bathrooms: Number(formData.get("bathrooms")),
