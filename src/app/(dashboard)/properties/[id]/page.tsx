@@ -1,5 +1,3 @@
-"use client"
-
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -10,14 +8,13 @@ import { ArrowLeft, MapPin, Bed, Bath, Users, DollarSign, User, Wifi, Plus, Home
 import { getPropertyById } from "@/actions/properties"
 import { PropertyActions } from "./property-actions"
 import { ICalLink } from "@/components/property/ical-link"
-import { use } from "react"
 
 interface Props {
   params: { id: string }
 }
 
-export default function PropertyDetailPage({ params }: Props) {
-  const property = use(getPropertyById(params.id))
+export default async function PropertyDetailPage({ params }: Props) {
+  const property = await getPropertyById(params.id)
 
   if (!property) {
     notFound()
