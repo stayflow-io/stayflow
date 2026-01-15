@@ -1,6 +1,6 @@
 import { getAllProperties } from "@/actions/properties"
 import { getOwners } from "@/actions/owners"
-import { CalendarView } from "./calendar-view"
+import { CalendarWrapper } from "./calendar-wrapper"
 
 export default async function CalendarPage() {
   const [properties, owners] = await Promise.all([
@@ -23,7 +23,7 @@ export default async function CalendarPage() {
         </p>
       </div>
 
-      <CalendarView properties={propertiesWithOwner} owners={owners} />
+      <CalendarWrapper properties={propertiesWithOwner} owners={owners} />
     </div>
   )
 }

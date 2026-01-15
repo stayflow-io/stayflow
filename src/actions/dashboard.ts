@@ -44,14 +44,39 @@ type DashboardStats = {
   pendingPayouts: number
 }
 
-export async function getDashboardStats(): Promise<DashboardStats> {
+export type DashboardFilters = {
+  ownerId?: string
+  propertyId?: string
+}
+
+// Helper para criar condicao de filtro por owner/property
+function buildUnitFilter(filters?: DashboardFilters) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const unitWhere: any = { deletedAt: null }
+
+  if (filters?.propertyId) {
+    unitWhere.propertyId = filters.propertyId
+  }
+
+  if (filters?.ownerId) {
+    unitWhere.OR = [
+      { ownerId: filters.ownerId },
+      { ownerId: null, property: { ownerId: filters.ownerId } },
+    ]
+  }
+
+  return unitWhere
+}
+
+export async function getDashboardStats(filters?: DashboardFilters): Promise<DashboardStats> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
   const tenantId = session.user.tenantId
+  const cacheKey = `${cacheKeys.dashboardStats(tenantId)}:${filters?.ownerId || 'all'}:${filters?.propertyId || 'all'}`
 
   return cache.getOrSet<DashboardStats>(
-    cacheKeys.dashboardStats(tenantId),
+    cacheKey,
     async () => {
       const now = new Date()
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -59,6 +84,8 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+      const unitFilter = buildUnitFilter(filters)
 
       const [
         unitsCount,
@@ -76,7 +103,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
           where: {
             property: { tenantId },
             status: "ACTIVE",
-            deletedAt: null,
+            ...unitFilter,
           },
         }),
         prisma.reservation.count({
@@ -84,6 +111,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             checkinDate: { gte: startOfMonth, lte: endOfMonth },
             status: { in: ["CONFIRMED", "CHECKED_IN"] },
+            unit: unitFilter,
           },
         }),
         prisma.task.count({
@@ -91,6 +119,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             status: { in: ["PENDING", "IN_PROGRESS"] },
             scheduledDate: { gte: today, lt: tomorrow },
+            unit: unitFilter,
           },
         }),
         prisma.reservation.aggregate({
@@ -98,6 +127,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             checkinDate: { gte: startOfMonth, lte: endOfMonth },
             status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+            unit: unitFilter,
           },
           _sum: { totalAmount: true },
         }),
@@ -106,6 +136,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             checkinDate: { gte: tomorrow, lte: in7Days },
             status: "CONFIRMED",
+            unit: unitFilter,
           },
           include: {
             unit: {
@@ -122,6 +153,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             scheduledDate: { gte: today, lt: tomorrow },
             status: { in: ["PENDING", "IN_PROGRESS"] },
+            unit: unitFilter,
           },
           include: {
             unit: {
@@ -138,6 +170,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             checkinDate: { gte: today, lt: tomorrow },
             status: "CONFIRMED",
+            unit: unitFilter,
           },
           include: {
             unit: {
@@ -153,6 +186,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             checkoutDate: { gte: today, lt: tomorrow },
             status: "CHECKED_IN",
+            unit: unitFilter,
           },
           include: {
             unit: {
@@ -168,14 +202,23 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             tenantId,
             scheduledDate: { lt: today },
             status: { in: ["PENDING", "IN_PROGRESS"] },
+            unit: unitFilter,
           },
         }),
-        prisma.ownerPayout.count({
-          where: {
-            owner: { tenantId },
-            status: "PENDING",
-          },
-        }),
+        // Payouts - filtrar por owner se especificado
+        filters?.ownerId
+          ? prisma.ownerPayout.count({
+              where: {
+                owner: { tenantId, id: filters.ownerId },
+                status: "PENDING",
+              },
+            })
+          : prisma.ownerPayout.count({
+              where: {
+                owner: { tenantId },
+                status: "PENDING",
+              },
+            }),
       ])
 
       return JSON.parse(JSON.stringify({
@@ -195,14 +238,15 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   )
 }
 
-export async function getRevenueByMonth() {
+export async function getRevenueByMonth(filters?: DashboardFilters) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
   const tenantId = session.user.tenantId
+  const cacheKey = `${cacheKeys.revenueByMonth(tenantId)}:${filters?.ownerId || 'all'}:${filters?.propertyId || 'all'}`
 
   return cache.getOrSet(
-    cacheKeys.revenueByMonth(tenantId),
+    cacheKey,
     async () => {
       const now = new Date()
 
@@ -210,11 +254,14 @@ export async function getRevenueByMonth() {
       const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
       const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
+      const unitFilter = buildUnitFilter(filters)
+
       const reservations = await prisma.reservation.findMany({
         where: {
           tenantId,
           checkinDate: { gte: sixMonthsAgo, lte: endOfCurrentMonth },
           status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+          unit: unitFilter,
         },
         select: {
           checkinDate: true,
@@ -255,25 +302,28 @@ export async function getRevenueByMonth() {
   )
 }
 
-export async function getOccupancyByUnit() {
+export async function getOccupancyByUnit(filters?: DashboardFilters) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
   const tenantId = session.user.tenantId
+  const cacheKey = `${cacheKeys.occupancy(tenantId)}:${filters?.ownerId || 'all'}:${filters?.propertyId || 'all'}`
 
   return cache.getOrSet(
-    cacheKeys.occupancy(tenantId),
+    cacheKey,
     async () => {
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       const daysInMonth = endOfMonth.getDate()
 
+      const unitFilter = buildUnitFilter(filters)
+
       const units = await prisma.unit.findMany({
         where: {
           property: { tenantId },
           status: "ACTIVE",
-          deletedAt: null,
+          ...unitFilter,
         },
         include: {
           property: { select: { name: true } },
@@ -317,14 +367,17 @@ type ReservationStatusCount = {
   color: string
 }
 
-export async function getReservationsByStatus(): Promise<ReservationStatusCount[]> {
+export async function getReservationsByStatus(filters?: DashboardFilters): Promise<ReservationStatusCount[]> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
   const tenantId = session.user.tenantId
+  const cacheKey = `dashboard:reservations-status:${tenantId}:${filters?.ownerId || 'all'}:${filters?.propertyId || 'all'}`
+
+  const unitFilter = buildUnitFilter(filters)
 
   return cache.getOrSet<ReservationStatusCount[]>(
-    `dashboard:reservations-status:${tenantId}`,
+    cacheKey,
     async () => {
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -335,6 +388,7 @@ export async function getReservationsByStatus(): Promise<ReservationStatusCount[
         where: {
           tenantId,
           checkinDate: { gte: startOfMonth, lte: endOfMonth },
+          unit: unitFilter,
         },
         _count: true,
       })

@@ -2,32 +2,52 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart, Sparkles } from "lucide-react"
-import { getDashboardStats, getRevenueByMonth, getOccupancyByUnit, getReservationsByStatus } from "@/actions/dashboard"
+import { getDashboardStats, getRevenueByMonth, getOccupancyByUnit, getReservationsByStatus, type DashboardFilters } from "@/actions/dashboard"
 import { getRevenueForecast } from "@/actions/reports"
+import { getAllProperties } from "@/actions/properties"
+import { getOwners } from "@/actions/owners"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { RevenueChart } from "@/components/charts/revenue-chart"
 import { OccupancyChart } from "@/components/charts/occupancy-chart"
 import { ReservationsByStatusChart } from "@/components/charts/reservations-by-status"
+import { DashboardFilters as DashboardFiltersComponent } from "./dashboard-filters"
 
-export default async function DashboardPage() {
-  const [data, revenueData, occupancyData, statusData, forecastData] = await Promise.all([
-    getDashboardStats(),
-    getRevenueByMonth(),
-    getOccupancyByUnit(),
-    getReservationsByStatus(),
+interface Props {
+  searchParams: { owner?: string; property?: string }
+}
+
+export default async function DashboardPage({ searchParams }: Props) {
+  const filters: DashboardFilters = {
+    ownerId: searchParams.owner,
+    propertyId: searchParams.property,
+  }
+
+  const [data, revenueData, occupancyData, statusData, forecastData, properties, owners] = await Promise.all([
+    getDashboardStats(filters),
+    getRevenueByMonth(filters),
+    getOccupancyByUnit(filters),
+    getReservationsByStatus(filters),
     getRevenueForecast(),
+    getAllProperties(),
+    getOwners(),
   ])
 
   const hasAlerts = data.overdueTasks > 0 || data.todayCheckins.length > 0 || data.todayCheckouts.length > 0 || data.pendingPayouts > 0
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Visao geral do seu negocio - {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground">
+            Visao geral do seu negocio - {format(new Date(), "EEEE, dd 'de' MMMM", { locale: ptBR })}
+          </p>
+        </div>
+        <DashboardFiltersComponent
+          properties={properties.map(p => ({ id: p.id, name: p.name, ownerId: p.ownerId }))}
+          owners={owners.map(o => ({ id: o.id, name: o.name }))}
+        />
       </div>
 
       {/* Alertas */}

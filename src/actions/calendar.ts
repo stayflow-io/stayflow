@@ -209,3 +209,165 @@ export async function deleteCalendarBlock(id: string) {
   revalidatePath("/calendar")
   return { success: true }
 }
+
+// Timeline types
+export type TimelineUnit = {
+  id: string
+  name: string
+  propertyId: string
+  propertyName: string
+}
+
+export type TimelineEvent = {
+  id: string
+  unitId: string
+  start: Date
+  end: Date
+  type: "reservation" | "block"
+  guestName?: string
+  status?: string
+  reason?: string
+}
+
+export type TimelineData = {
+  units: TimelineUnit[]
+  events: TimelineEvent[]
+}
+
+export async function getCalendarTimelineData(
+  startDate: Date,
+  endDate: Date,
+  filters?: { propertyId?: string; ownerId?: string }
+): Promise<TimelineData> {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const tenantId = session.user.tenantId
+  const startKey = startDate.toISOString().split('T')[0]
+  const endKey = endDate.toISOString().split('T')[0]
+  const cacheKey = `calendar:timeline:${tenantId}:${startKey}:${endKey}:${filters?.propertyId || 'all'}:${filters?.ownerId || 'all'}`
+
+  return cache.getOrSet<TimelineData>(
+    cacheKey,
+    async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const unitWhere: any = {
+        deletedAt: null,
+        status: "ACTIVE",
+        property: {
+          tenantId,
+          deletedAt: null,
+        },
+      }
+
+      if (filters?.propertyId) {
+        unitWhere.propertyId = filters.propertyId
+      }
+
+      if (filters?.ownerId) {
+        unitWhere.OR = [
+          { ownerId: filters.ownerId },
+          { ownerId: null, property: { ownerId: filters.ownerId } },
+        ]
+      }
+
+      // Buscar unidades ordenadas por property e nome
+      const units = await prisma.unit.findMany({
+        where: unitWhere,
+        include: {
+          property: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { property: { name: "asc" } },
+          { name: "asc" },
+        ],
+      })
+
+      const unitIds = units.map(u => u.id)
+
+      // Buscar reservas e bloqueios em paralelo
+      const [reservations, blocks] = await Promise.all([
+        prisma.reservation.findMany({
+          where: {
+            tenantId,
+            unitId: { in: unitIds },
+            OR: [
+              { checkinDate: { gte: startDate, lte: endDate } },
+              { checkoutDate: { gte: startDate, lte: endDate } },
+              {
+                AND: [
+                  { checkinDate: { lte: startDate } },
+                  { checkoutDate: { gte: endDate } },
+                ],
+              },
+            ],
+            status: { notIn: ["CANCELLED", "NO_SHOW"] },
+          },
+          select: {
+            id: true,
+            unitId: true,
+            checkinDate: true,
+            checkoutDate: true,
+            guestName: true,
+            status: true,
+          },
+        }),
+        prisma.calendarBlock.findMany({
+          where: {
+            unitId: { in: unitIds },
+            OR: [
+              { startDate: { gte: startDate, lte: endDate } },
+              { endDate: { gte: startDate, lte: endDate } },
+              {
+                AND: [
+                  { startDate: { lte: startDate } },
+                  { endDate: { gte: endDate } },
+                ],
+              },
+            ],
+          },
+          select: {
+            id: true,
+            unitId: true,
+            startDate: true,
+            endDate: true,
+            reason: true,
+          },
+        }),
+      ])
+
+      const events: TimelineEvent[] = [
+        ...reservations.map((r) => ({
+          id: r.id,
+          unitId: r.unitId,
+          start: r.checkinDate,
+          end: r.checkoutDate,
+          type: "reservation" as const,
+          guestName: r.guestName,
+          status: r.status,
+        })),
+        ...blocks.map((b) => ({
+          id: b.id,
+          unitId: b.unitId,
+          start: b.startDate,
+          end: b.endDate,
+          type: "block" as const,
+          reason: b.reason || undefined,
+        })),
+      ]
+
+      const result = {
+        units: units.map(u => ({
+          id: u.id,
+          name: u.name,
+          propertyId: u.property.id,
+          propertyName: u.property.name,
+        })),
+        events,
+      }
+
+      return JSON.parse(JSON.stringify(result))
+    },
+    TTL.SHORT
+  )
+}
