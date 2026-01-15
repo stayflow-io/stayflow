@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, MapPin, Bed, Bath, Users, DollarSign, User, Wifi, Plus, Home, Building2 } from "lucide-react"
+import { ArrowLeft, MapPin, Bed, Bath, Users, DollarSign, User, Plus, Home, Building2 } from "lucide-react"
 import { getPropertyById } from "@/actions/properties"
 import { PropertyActions } from "./property-actions"
 import { ICalLink } from "@/components/property/ical-link"
+import { AmenityBadge } from "@/components/ui/amenity-badge"
 
 interface Props {
   params: { id: string }
@@ -244,9 +245,7 @@ export default async function PropertyDetailPage({ params }: Props) {
                   <h4 className="text-sm font-medium mb-2">Comodidades do Imovel</h4>
                   <div className="flex flex-wrap gap-1">
                     {property.amenities.map((amenity: string) => (
-                      <Badge key={amenity} variant="secondary" className="text-xs">
-                        {amenity}
-                      </Badge>
+                      <AmenityBadge key={amenity} amenity={amenity} className="text-xs py-0.5 px-2" />
                     ))}
                   </div>
                 </div>

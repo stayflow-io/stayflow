@@ -3,12 +3,13 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Bed, Bath, Users, DollarSign, User, Pencil, Wifi } from "lucide-react"
+import { ArrowLeft, Bed, Bath, Users, DollarSign, User, Pencil } from "lucide-react"
 import { getUnit } from "@/actions/units"
 import { getPricingRules } from "@/actions/pricing"
 import { UnitActions } from "./unit-actions"
 import { UnitPhotos } from "./unit-photos"
 import { PricingRules } from "./pricing-rules"
+import { AmenityBadge } from "@/components/ui/amenity-badge"
 
 interface Props {
   params: { id: string; unitId: string }
@@ -116,13 +117,7 @@ export default async function UnitDetailPage({ params }: Props) {
                 <h4 className="font-medium mb-3">Comodidades</h4>
                 <div className="flex flex-wrap gap-2">
                   {unit.amenities.map((amenity: string) => (
-                    <div
-                      key={amenity}
-                      className="flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
-                    >
-                      <Wifi className="h-3 w-3" />
-                      {amenity}
-                    </div>
+                    <AmenityBadge key={amenity} amenity={amenity} />
                   ))}
                 </div>
               </div>
