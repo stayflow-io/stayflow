@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart, Sparkles } from "lucide-react"
+import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart, Sparkles, Percent } from "lucide-react"
 import { getDashboardStats, getRevenueByMonth, getOccupancyByUnit, getReservationsByStatus, type DashboardFilters } from "@/actions/dashboard"
 import { getRevenueForecast } from "@/actions/reports"
 import { getAllProperties } from "@/actions/properties"
@@ -12,6 +12,7 @@ import { RevenueChart } from "@/components/charts/revenue-chart"
 import { OccupancyChart } from "@/components/charts/occupancy-chart"
 import { ReservationsByStatusChart } from "@/components/charts/reservations-by-status"
 import { DashboardFilters as DashboardFiltersComponent } from "./dashboard-filters"
+import { StatCard } from "@/components/dashboard/stat-card"
 
 interface Props {
   searchParams: { owner?: string; property?: string }
@@ -123,71 +124,50 @@ export default async function DashboardPage({ searchParams }: Props) {
         </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Unidades Ativas
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.unitsCount}</div>
-            <p className="text-xs text-muted-foreground">
-              unidades cadastradas
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <StatCard
+          title="Unidades Ativas"
+          value={data.unitsCount}
+          subtitle="unidades cadastradas"
+          icon={<Building2 className="h-4 w-4 text-muted-foreground" />}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Reservas do Mes
-            </CardTitle>
-            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.reservationsThisMonth}</div>
-            <p className="text-xs text-muted-foreground">
-              check-ins este mes
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Reservas do Mes"
+          value={data.reservationsThisMonth}
+          subtitle="vs. mes anterior"
+          icon={<CalendarCheck className="h-4 w-4 text-muted-foreground" />}
+          currentValue={data.reservationsThisMonth}
+          previousValue={data.reservationsLastMonth}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tarefas Hoje
-            </CardTitle>
-            <ClipboardList className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{data.pendingTasksCount}</div>
-            <p className="text-xs text-muted-foreground">
-              pendentes para hoje
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Taxa de Ocupacao"
+          value={`${data.occupancyThisMonth.toFixed(1)}%`}
+          subtitle="vs. mes anterior"
+          icon={<Percent className="h-4 w-4 text-muted-foreground" />}
+          currentValue={data.occupancyThisMonth}
+          previousValue={data.occupancyLastMonth}
+        />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Receita do Mes
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {new Intl.NumberFormat("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              }).format(data.revenueThisMonth)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              receita bruta
-            </p>
-          </CardContent>
-        </Card>
+        <StatCard
+          title="Tarefas Hoje"
+          value={data.pendingTasksCount}
+          subtitle="pendentes para hoje"
+          icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+        />
+
+        <StatCard
+          title="Receita do Mes"
+          value={new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          }).format(data.revenueThisMonth)}
+          subtitle="vs. mes anterior"
+          icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          currentValue={data.revenueThisMonth}
+          previousValue={data.revenueLastMonth}
+        />
       </div>
 
       {/* Graficos */}
@@ -199,11 +179,11 @@ export default async function DashboardPage({ searchParams }: Props) {
               Receita Mensal
             </CardTitle>
             <CardDescription>
-              Evolucao da receita nos ultimos 6 meses
+              Comparativo de receita - ultimos 6 meses vs ano anterior
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RevenueChart data={revenueData} />
+            <RevenueChart data={revenueData} showComparison={true} />
           </CardContent>
         </Card>
 

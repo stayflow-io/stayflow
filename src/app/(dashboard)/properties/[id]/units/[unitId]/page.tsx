@@ -5,15 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, Bed, Bath, Users, DollarSign, User, Pencil, Wifi } from "lucide-react"
 import { getUnit } from "@/actions/units"
+import { getPricingRules } from "@/actions/pricing"
 import { UnitActions } from "./unit-actions"
 import { UnitPhotos } from "./unit-photos"
+import { PricingRules } from "./pricing-rules"
 
 interface Props {
   params: { id: string; unitId: string }
 }
 
 export default async function UnitDetailPage({ params }: Props) {
-  const unit = await getUnit(params.unitId)
+  const [unit, pricingRules] = await Promise.all([
+    getUnit(params.unitId),
+    getPricingRules(params.unitId).catch(() => []),
+  ])
 
   if (!unit || unit.property.id !== params.id) {
     notFound()
@@ -62,6 +67,9 @@ export default async function UnitDetailPage({ params }: Props) {
 
       {/* Fotos */}
       <UnitPhotos unitId={unit.id} photos={unit.photos || []} />
+
+      {/* Regras de Preco */}
+      <PricingRules unitId={unit.id} rules={pricingRules} />
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2">

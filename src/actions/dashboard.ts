@@ -42,6 +42,11 @@ type DashboardStats = {
   todayCheckouts: ReservationWithUnit[]
   overdueTasks: number
   pendingPayouts: number
+  // Comparacoes com mes anterior
+  reservationsLastMonth: number
+  revenueLastMonth: number
+  occupancyThisMonth: number
+  occupancyLastMonth: number
 }
 
 export type DashboardFilters = {
@@ -83,7 +88,13 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
       const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000)
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      const daysInMonth = endOfMonth.getDate()
       const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+
+      // Mes anterior para comparacao
+      const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+      const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+      const daysInLastMonth = endOfLastMonth.getDate()
 
       const unitFilter = buildUnitFilter(filters)
 
@@ -98,6 +109,13 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
         todayCheckouts,
         overdueTasks,
         pendingPayouts,
+        // Dados do mes anterior
+        reservationsLastMonth,
+        revenueLastMonth,
+        // Ocupacao mes atual
+        occupancyUnitsThisMonth,
+        // Ocupacao mes anterior
+        occupancyUnitsLastMonth,
       ] = await Promise.all([
         prisma.unit.count({
           where: {
@@ -219,7 +237,78 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
                 status: "PENDING",
               },
             }),
+        // Reservas mes anterior
+        prisma.reservation.count({
+          where: {
+            tenantId,
+            checkinDate: { gte: startOfLastMonth, lte: endOfLastMonth },
+            status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+            unit: unitFilter,
+          },
+        }),
+        // Receita mes anterior
+        prisma.reservation.aggregate({
+          where: {
+            tenantId,
+            checkinDate: { gte: startOfLastMonth, lte: endOfLastMonth },
+            status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+            unit: unitFilter,
+          },
+          _sum: { totalAmount: true },
+        }),
+        // Ocupacao mes atual
+        prisma.unit.findMany({
+          where: {
+            property: { tenantId },
+            status: "ACTIVE",
+            ...unitFilter,
+          },
+          include: {
+            reservations: {
+              where: {
+                checkinDate: { lte: endOfMonth },
+                checkoutDate: { gte: startOfMonth },
+                status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+              },
+            },
+          },
+        }),
+        // Ocupacao mes anterior
+        prisma.unit.findMany({
+          where: {
+            property: { tenantId },
+            status: "ACTIVE",
+            ...unitFilter,
+          },
+          include: {
+            reservations: {
+              where: {
+                checkinDate: { lte: endOfLastMonth },
+                checkoutDate: { gte: startOfLastMonth },
+                status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
+              },
+            },
+          },
+        }),
       ])
+
+      // Calcular taxa de ocupacao
+      function calculateOccupancy(units: typeof occupancyUnitsThisMonth, startDate: Date, endDate: Date, totalDays: number) {
+        if (units.length === 0) return 0
+        let totalOccupiedDays = 0
+        for (const unit of units) {
+          for (const reservation of unit.reservations) {
+            const checkin = new Date(Math.max(reservation.checkinDate.getTime(), startDate.getTime()))
+            const checkout = new Date(Math.min(reservation.checkoutDate.getTime(), endDate.getTime()))
+            const days = Math.ceil((checkout.getTime() - checkin.getTime()) / (1000 * 60 * 60 * 24))
+            totalOccupiedDays += Math.max(0, days)
+          }
+        }
+        return (totalOccupiedDays / (units.length * totalDays)) * 100
+      }
+
+      const occupancyThisMonth = calculateOccupancy(occupancyUnitsThisMonth, startOfMonth, endOfMonth, daysInMonth)
+      const occupancyLastMonth = calculateOccupancy(occupancyUnitsLastMonth, startOfLastMonth, endOfLastMonth, daysInLastMonth)
 
       return JSON.parse(JSON.stringify({
         unitsCount,
@@ -232,6 +321,11 @@ export async function getDashboardStats(filters?: DashboardFilters): Promise<Das
         todayCheckouts,
         overdueTasks,
         pendingPayouts,
+        // Comparacoes
+        reservationsLastMonth,
+        revenueLastMonth: revenueLastMonth._sum.totalAmount?.toNumber() || 0,
+        occupancyThisMonth,
+        occupancyLastMonth,
       }))
     },
     TTL.SHORT // 1 minuto - dados do dashboard mudam frequentemente
@@ -250,8 +344,8 @@ export async function getRevenueByMonth(filters?: DashboardFilters) {
     async () => {
       const now = new Date()
 
-      // Buscar período de 6 meses em uma única query
-      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+      // Buscar período de 18 meses para comparar ano a ano
+      const eighteenMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 17, 1)
       const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
       const unitFilter = buildUnitFilter(filters)
@@ -259,7 +353,7 @@ export async function getRevenueByMonth(filters?: DashboardFilters) {
       const reservations = await prisma.reservation.findMany({
         where: {
           tenantId,
-          checkinDate: { gte: sixMonthsAgo, lte: endOfCurrentMonth },
+          checkinDate: { gte: eighteenMonthsAgo, lte: endOfCurrentMonth },
           status: { in: ["CONFIRMED", "CHECKED_IN", "CHECKED_OUT"] },
           unit: unitFilter,
         },
@@ -272,12 +366,6 @@ export async function getRevenueByMonth(filters?: DashboardFilters) {
       // Agrupar por mês no JavaScript
       const revenueByMonth = new Map<string, number>()
 
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        const key = `${date.getFullYear()}-${date.getMonth()}`
-        revenueByMonth.set(key, 0)
-      }
-
       for (const reservation of reservations) {
         const date = new Date(reservation.checkinDate)
         const key = `${date.getFullYear()}-${date.getMonth()}`
@@ -285,14 +373,16 @@ export async function getRevenueByMonth(filters?: DashboardFilters) {
         revenueByMonth.set(key, current + Number(reservation.totalAmount))
       }
 
-      const months: { month: string; revenue: number }[] = []
+      const months: { month: string; revenue: number; revenueLastYear: number }[] = []
       for (let i = 5; i >= 0; i--) {
         const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const key = `${date.getFullYear()}-${date.getMonth()}`
+        const lastYearKey = `${date.getFullYear() - 1}-${date.getMonth()}`
         const monthName = date.toLocaleDateString("pt-BR", { month: "short" })
         months.push({
           month: monthName.charAt(0).toUpperCase() + monthName.slice(1),
           revenue: revenueByMonth.get(key) || 0,
+          revenueLastYear: revenueByMonth.get(lastYearKey) || 0,
         })
       }
 

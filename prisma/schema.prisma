@@ -137,6 +137,7 @@ model Unit {
   calendarBlocks CalendarBlock[]
   tasks          Task[]
   transactions   Transaction[]
+  pricingRules   PricingRule[]
 
   @@index([propertyId])
   @@index([ownerId])
@@ -147,6 +148,13 @@ enum UnitStatus {
   ACTIVE
   INACTIVE
   MAINTENANCE
+}
+
+enum PricingRuleType {
+  BASE          // Preco base padrao da unidade
+  SEASONAL      // Temporadas (ex: alta temporada, baixa temporada)
+  DAY_OF_WEEK   // Dia da semana (ex: fim de semana mais caro)
+  SPECIAL       // Datas especiais (ex: Carnaval, Reveillon)
 }
 
 model UnitPhoto {
@@ -199,6 +207,31 @@ model CalendarBlock {
   unit Unit @relation(fields: [unitId], references: [id])
 
   @@index([unitId, startDate, endDate])
+}
+
+// ==================== PRICING ====================
+
+model PricingRule {
+  id          String          @id @default(cuid())
+  unitId      String
+  name        String          // Ex: "Alta Temporada", "Fim de Semana", "Carnaval 2024"
+  type        PricingRuleType
+  priority    Int             @default(0) // Maior prioridade sobrescreve regras menores
+  basePrice   Decimal         // Preco por diaria
+  minNights   Int             @default(1)
+  // Para SEASONAL
+  startDate   DateTime?
+  endDate     DateTime?
+  // Para DAY_OF_WEEK
+  daysOfWeek  Int[]           // 0=Domingo, 1=Segunda, ..., 6=Sabado
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+
+  @@index([unitId, active])
+  @@index([unitId, type])
 }
 
 // ==================== GUESTS ====================

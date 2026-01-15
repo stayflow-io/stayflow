@@ -210,6 +210,92 @@ export async function deleteCalendarBlock(id: string) {
   return { success: true }
 }
 
+// Bulk block - bloquear multiplas unidades de uma vez
+export async function createBulkCalendarBlocks(data: {
+  unitIds: string[]
+  startDate: Date
+  endDate: Date
+  reason?: string
+}) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const { unitIds, startDate, endDate, reason } = data
+
+  if (!unitIds.length || !startDate || !endDate) {
+    return { error: "Campos obrigatorios nao preenchidos" }
+  }
+
+  if (startDate > endDate) {
+    return { error: "Data inicial deve ser anterior a data final" }
+  }
+
+  // Verificar se todas as unidades pertencem ao tenant
+  const units = await prisma.unit.findMany({
+    where: {
+      id: { in: unitIds },
+      property: { tenantId: session.user.tenantId },
+      deletedAt: null,
+    },
+    select: { id: true },
+  })
+
+  if (units.length !== unitIds.length) {
+    return { error: "Uma ou mais unidades nao foram encontradas" }
+  }
+
+  // Criar bloqueios para todas as unidades
+  await prisma.calendarBlock.createMany({
+    data: units.map((unit) => ({
+      unitId: unit.id,
+      startDate,
+      endDate,
+      reason: reason || null,
+    })),
+  })
+
+  // Invalidar cache do calendário
+  await invalidateCalendarCache(session.user.tenantId)
+
+  revalidatePath("/calendar")
+  return { success: true, count: units.length }
+}
+
+// Obter unidades agrupadas por property para seleção
+export async function getUnitsForBulkBlock() {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const tenantId = session.user.tenantId
+
+  const properties = await prisma.property.findMany({
+    where: {
+      tenantId,
+      deletedAt: null,
+    },
+    include: {
+      units: {
+        where: {
+          deletedAt: null,
+          status: "ACTIVE",
+        },
+        select: {
+          id: true,
+          name: true,
+        },
+        orderBy: { name: "asc" },
+      },
+    },
+    orderBy: { name: "asc" },
+  })
+
+  return properties.map((p) => ({
+    id: p.id,
+    name: p.name,
+    units: p.units,
+  }))
+}
+
 // Timeline types
 export type TimelineUnit = {
   id: string
