@@ -1,25 +1,23 @@
+"use client"
+
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { ArrowLeft, MapPin, Bed, Bath, Users, DollarSign, User, Wifi } from "lucide-react"
+import { ArrowLeft, MapPin, Bed, Bath, Users, DollarSign, User, Wifi, Plus, Home, Building2 } from "lucide-react"
 import { getPropertyById } from "@/actions/properties"
-import { getPropertyPhotos } from "@/actions/photos"
 import { PropertyActions } from "./property-actions"
-import { PhotoUpload } from "@/components/property/photo-upload"
 import { ICalLink } from "@/components/property/ical-link"
+import { use } from "react"
 
 interface Props {
   params: { id: string }
 }
 
-export default async function PropertyDetailPage({ params }: Props) {
-  const [property, photos] = await Promise.all([
-    getPropertyById(params.id),
-    getPropertyPhotos(params.id),
-  ])
+export default function PropertyDetailPage({ params }: Props) {
+  const property = use(getPropertyById(params.id))
 
   if (!property) {
     notFound()
@@ -32,6 +30,11 @@ export default async function PropertyDetailPage({ params }: Props) {
   }
 
   const status = statusMap[property.status] || statusMap.ACTIVE
+
+  // Calcular totais das units
+  const totalBedrooms = property.units?.reduce((sum: number, u: any) => sum + u.bedrooms, 0) || 0
+  const totalBathrooms = property.units?.reduce((sum: number, u: any) => sum + u.bathrooms, 0) || 0
+  const totalGuests = property.units?.reduce((sum: number, u: any) => sum + u.maxGuests, 0) || 0
 
   return (
     <div className="space-y-6">
@@ -58,139 +61,203 @@ export default async function PropertyDetailPage({ params }: Props) {
         </div>
       </div>
 
-      {/* Fotos */}
-      <Card>
-        <CardContent className="pt-6">
-          <PhotoUpload propertyId={property.id} photos={photos} />
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>Detalhes do Imovel</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {property.description && (
+      {/* Resumo Geral */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
               <div>
-                <h4 className="font-medium mb-2">Descricao</h4>
-                <p className="text-muted-foreground">{property.description}</p>
-              </div>
-            )}
-
-            <Separator />
-
-            <div>
-              <h4 className="font-medium mb-3">Capacidade</h4>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <Bed className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-2xl font-bold">{property.bedrooms}</p>
-                    <p className="text-xs text-muted-foreground">Quartos</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <Bath className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-2xl font-bold">{property.bathrooms}</p>
-                    <p className="text-xs text-muted-foreground">Banheiros</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-                  <Users className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-2xl font-bold">{property.maxGuests}</p>
-                    <p className="text-xs text-muted-foreground">Hospedes</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {property.amenities.length > 0 && (
-              <>
-                <Separator />
-                <div>
-                  <h4 className="font-medium mb-3">Comodidades</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {property.amenities.map((amenity: string) => (
-                      <div
-                        key={amenity}
-                        className="flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"
-                      >
-                        <Wifi className="h-3 w-3" />
-                        {amenity}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-
-            <Separator />
-
-            <div>
-              <h4 className="font-medium mb-3">Endereco Completo</h4>
-              <div className="p-4 bg-muted rounded-lg">
-                <p>{property.address}</p>
-                <p>{property.city} - {property.state}</p>
-                {property.zipcode && <p>CEP: {property.zipcode}</p>}
+                <p className="text-2xl font-bold">{property.units?.length || 0}</p>
+                <p className="text-xs text-muted-foreground">Unidades</p>
               </div>
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Bed className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">{totalBedrooms}</p>
+                <p className="text-xs text-muted-foreground">Quartos (total)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Bath className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">{totalBathrooms}</p>
+                <p className="text-xs text-muted-foreground">Banheiros (total)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold">{totalGuests}</p>
+                <p className="text-xs text-muted-foreground">Hospedes (total)</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-3">
+        {/* Unidades */}
+        <Card className="md:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Unidades</CardTitle>
+              <CardDescription>
+                Apartamentos, quartos ou espacos deste imovel
+              </CardDescription>
+            </div>
+            <Button asChild>
+              <Link href={`/properties/${property.id}/units/new`}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Unidade
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {property.units?.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Home className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Nenhuma unidade cadastrada</p>
+                <p className="text-sm">Adicione unidades para comecar a gerenciar reservas</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {property.units?.map((unit: any) => {
+                  const unitStatus = statusMap[unit.status] || statusMap.ACTIVE
+                  return (
+                    <Link
+                      key={unit.id}
+                      href={`/properties/${property.id}/units/${unit.id}`}
+                      className="block p-4 border rounded-lg hover:bg-muted transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{unit.name}</h4>
+                            <Badge variant={unitStatus.variant} className="text-xs">
+                              {unitStatus.label}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Bed className="h-3 w-3" />
+                              {unit.bedrooms} quartos
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Bath className="h-3 w-3" />
+                              {unit.bathrooms} banheiros
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {unit.maxGuests} hospedes
+                            </span>
+                          </div>
+                          {unit.owner && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Proprietario: {unit.owner.name}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium">
+                            {new Intl.NumberFormat("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            }).format(Number(unit.cleaningFee))}
+                          </p>
+                          <p className="text-xs text-muted-foreground">taxa limpeza</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {unit._count?.reservations || 0} reservas
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <div className="space-y-6">
+          {/* Proprietario */}
+          {property.owner && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Proprietario Padrao
+                </CardTitle>
+                <CardDescription>
+                  Proprietario padrao das unidades sem owner especifico
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="font-medium">{property.owner.name}</p>
+                <p className="text-sm text-muted-foreground">{property.owner.email}</p>
+                {property.owner.phone && (
+                  <p className="text-sm text-muted-foreground">{property.owner.phone}</p>
+                )}
+                <Button variant="link" className="px-0 mt-2" asChild>
+                  <Link href={`/owners/${property.owner.id}`}>
+                    Ver perfil completo
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Detalhes do Imovel */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Proprietario
-              </CardTitle>
+              <CardTitle>Detalhes do Imovel</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="font-medium">{property.owner.name}</p>
-              <p className="text-sm text-muted-foreground">{property.owner.email}</p>
-              {property.owner.phone && (
-                <p className="text-sm text-muted-foreground">{property.owner.phone}</p>
+            <CardContent className="space-y-4">
+              {property.description && (
+                <div>
+                  <h4 className="text-sm font-medium mb-1">Descricao</h4>
+                  <p className="text-sm text-muted-foreground">{property.description}</p>
+                </div>
               )}
-              <Button variant="link" className="px-0 mt-2" asChild>
-                <Link href={`/owners/${property.owner.id}`}>
-                  Ver perfil completo
-                </Link>
-              </Button>
+
+              <div>
+                <h4 className="text-sm font-medium mb-1">Endereco</h4>
+                <div className="text-sm text-muted-foreground">
+                  <p>{property.address}</p>
+                  <p>{property.city} - {property.state}</p>
+                  {property.zipcode && <p>CEP: {property.zipcode}</p>}
+                </div>
+              </div>
+
+              {property.amenities?.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Comodidades do Imovel</h4>
+                  <div className="flex flex-wrap gap-1">
+                    {property.amenities.map((amenity: string) => (
+                      <Badge key={amenity} variant="secondary" className="text-xs">
+                        {amenity}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4" />
-                Financeiro
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Taxa de Limpeza</span>
-                <span className="font-medium">
-                  {new Intl.NumberFormat("pt-BR", {
-                    style: "currency",
-                    currency: "BRL",
-                  }).format(Number(property.cleaningFee))}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Taxa Admin.</span>
-                <span className="font-medium">{Number(property.adminFeePercent)}%</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Comissao Prop.</span>
-                <span className="font-medium">{Number(property.owner.commissionPercent)}%</span>
-              </div>
-            </CardContent>
-          </Card>
-
+          {/* Acoes Rapidas */}
           <Card>
             <CardHeader>
               <CardTitle>Acoes Rapidas</CardTitle>
