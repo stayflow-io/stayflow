@@ -4,9 +4,11 @@ import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
+import { ChevronLeft, ChevronRight, ChevronDown } from "lucide-react"
 import { getCalendarTimelineData, type TimelineData, type TimelineEvent } from "@/actions/calendar"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, differenceInDays, isBefore, isAfter } from "date-fns"
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isToday, differenceInDays, isBefore, isAfter, startOfDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import Link from "next/link"
 
@@ -38,9 +40,13 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
   const [currentDate, setCurrentDate] = useState(new Date())
   const [selectedProperty, setSelectedProperty] = useState<string>("all")
   const [selectedOwner, setSelectedOwner] = useState<string>("all")
+  const [showOnlyOccupied, setShowOnlyOccupied] = useState(false)
   const [data, setData] = useState<TimelineData>({ units: [], events: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [collapsedProperties, setCollapsedProperties] = useState<Set<string>>(new Set())
+
+  // Largura fixa de cada celula de dia (em pixels)
+  const DAY_CELL_WIDTH = 40
 
   const monthStart = startOfMonth(currentDate)
   const monthEnd = endOfMonth(currentDate)
@@ -117,10 +123,29 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
     return data.events.filter(e => e.unitId === unitId)
   }
 
-  // Calcular posicao e largura da barra
+  // Set de unidades com eventos para busca rapida
+  const unitsWithEvents = useMemo(() => {
+    return new Set(data.events.map(e => e.unitId))
+  }, [data.events])
+
+  // Filtrar unidades para mostrar apenas ocupadas se necessario
+  const filteredGroupedUnits = useMemo(() => {
+    if (!showOnlyOccupied) return groupedUnits
+
+    const filtered: Record<string, { propertyName: string; units: typeof data.units }> = {}
+    Object.entries(groupedUnits).forEach(([propertyId, group]) => {
+      const occupiedUnits = group.units.filter(unit => unitsWithEvents.has(unit.id))
+      if (occupiedUnits.length > 0) {
+        filtered[propertyId] = { propertyName: group.propertyName, units: occupiedUnits }
+      }
+    })
+    return filtered
+  }, [groupedUnits, showOnlyOccupied, unitsWithEvents])
+
+  // Calcular posicao e largura da barra (em pixels)
   function getEventStyle(event: TimelineEvent) {
-    const eventStart = new Date(event.start)
-    const eventEnd = new Date(event.end)
+    const eventStart = startOfDay(new Date(event.start))
+    const eventEnd = startOfDay(new Date(event.end))
 
     // Ajustar para limites do mes
     const visibleStart = isBefore(eventStart, monthStart) ? monthStart : eventStart
@@ -133,9 +158,10 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
       ? statusColors.block
       : statusColors[event.status || "CONFIRMED"]
 
+    // Usar pixels absolutos para posicionamento preciso
     return {
-      left: `${(startOffset / days.length) * 100}%`,
-      width: `${(duration / days.length) * 100}%`,
+      left: startOffset * DAY_CELL_WIDTH,
+      width: duration * DAY_CELL_WIDTH,
       ...colors,
     }
   }
@@ -195,6 +221,17 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
             </Button>
           </div>
         </div>
+        {/* Filtro de ocupados */}
+        <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+          <Checkbox
+            id="show-occupied"
+            checked={showOnlyOccupied}
+            onCheckedChange={(checked) => setShowOnlyOccupied(checked === true)}
+          />
+          <Label htmlFor="show-occupied" className="text-sm cursor-pointer">
+            Mostrar apenas unidades com reservas/bloqueios neste mes
+          </Label>
+        </div>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -209,27 +246,30 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
           <div className="border rounded-lg overflow-hidden">
             {/* Header com dias */}
             <div className="flex border-b bg-muted">
-              <div className="w-48 min-w-[192px] p-2 font-medium border-r sticky left-0 bg-muted z-10">
+              <div className="w-48 min-w-[192px] p-2 font-medium border-r sticky left-0 bg-muted z-20">
                 Unidade
               </div>
-              <div className="flex-1 flex overflow-x-auto">
-                {days.map((day, i) => (
-                  <div
-                    key={i}
-                    className={`flex-shrink-0 w-10 min-w-[40px] p-1 text-center text-xs border-r ${
-                      isToday(day) ? "bg-primary text-primary-foreground" : ""
-                    }`}
-                  >
-                    <div className="font-medium">{format(day, "d")}</div>
-                    <div className="text-[10px] opacity-70">{format(day, "EEE", { locale: ptBR })}</div>
-                  </div>
-                ))}
+              <div className="overflow-x-auto">
+                <div className="flex" style={{ width: days.length * DAY_CELL_WIDTH }}>
+                  {days.map((day, i) => (
+                    <div
+                      key={i}
+                      className={`flex-shrink-0 p-1 text-center text-xs border-r ${
+                        isToday(day) ? "bg-primary text-primary-foreground" : ""
+                      }`}
+                      style={{ width: DAY_CELL_WIDTH }}
+                    >
+                      <div className="font-medium">{format(day, "d")}</div>
+                      <div className="text-[10px] opacity-70">{format(day, "EEE", { locale: ptBR })}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
             {/* Linhas por property/unit */}
             <div className="overflow-x-auto">
-              {Object.entries(groupedUnits).map(([propertyId, group]) => (
+              {Object.entries(filteredGroupedUnits).map(([propertyId, group]) => (
                 <div key={propertyId}>
                   {/* Property header */}
                   <div
@@ -257,7 +297,18 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
                           <div className="w-48 min-w-[192px] p-2 text-sm border-r sticky left-0 bg-background z-10 truncate pl-8">
                             {unit.name}
                           </div>
-                          <div className="flex-1 relative h-10" style={{ minWidth: `${days.length * 40}px` }}>
+                          <div className="relative h-10" style={{ width: days.length * DAY_CELL_WIDTH }}>
+                            {/* Grid de dias para referencia visual */}
+                            <div className="absolute inset-0 flex">
+                              {days.map((_, i) => (
+                                <div
+                                  key={i}
+                                  className="border-r border-gray-100 dark:border-gray-800"
+                                  style={{ width: DAY_CELL_WIDTH }}
+                                />
+                              ))}
+                            </div>
+                            {/* Eventos */}
                             {events.map((event) => {
                               const style = getEventStyle(event)
                               const isReservation = event.type === "reservation"
@@ -282,6 +333,13 @@ export function CalendarTimeline({ properties, owners }: CalendarTimelineProps) 
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Mensagem quando filtro ativo e sem resultados */}
+        {!isLoading && showOnlyOccupied && Object.keys(filteredGroupedUnits).length === 0 && data.units.length > 0 && (
+          <div className="min-h-[200px] flex items-center justify-center">
+            <p className="text-muted-foreground">Nenhuma unidade com ocupacao neste mes</p>
           </div>
         )}
 
