@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function ReportExportForm({ reportType, description }: Props) {
+  const { data: session } = useSession()
   const [format, setFormat] = useState("xlsx")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
@@ -30,6 +32,12 @@ export function ReportExportForm({ reportType, description }: Props) {
     setIsLoading(true)
 
     try {
+      // Opcoes do relatorio com logo do tenant
+      const reportOptions = {
+        tenantName: session?.user?.tenantName,
+        tenantLogo: session?.user?.tenantLogo,
+      }
+
       // Handle PDF export client-side
       if (format === "pdf") {
         const periodStart = startDate ? new Date(startDate) : undefined
@@ -38,13 +46,13 @@ export function ReportExportForm({ reportType, description }: Props) {
         if (reportType === "reservations") {
           const data = await getReservationsReportData(periodStart, periodEnd)
           if (data) {
-            const doc = generateReservationsReport(data)
+            const doc = await generateReservationsReport(data, reportOptions)
             doc.save(`reservas_${new Date().toISOString().split("T")[0]}.pdf`)
           }
         } else if (reportType === "financial") {
           const data = await getFinancialReportData(periodStart, periodEnd)
           if (data) {
-            const doc = generateFinancialTransactionsReport(data)
+            const doc = await generateFinancialTransactionsReport(data, reportOptions)
             doc.save(`financeiro_${new Date().toISOString().split("T")[0]}.pdf`)
           }
         }

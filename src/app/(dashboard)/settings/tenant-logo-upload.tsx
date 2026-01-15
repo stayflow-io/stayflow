@@ -1,6 +1,8 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
+import { useRouter } from "next/navigation"
 import { ImageUpload } from "@/components/ui/image-upload"
 import { updateTenantLogo } from "@/actions/tenant"
 import { useToast } from "@/hooks/use-toast"
@@ -10,6 +12,8 @@ interface Props {
 }
 
 export function TenantLogoUpload({ currentLogo }: Props) {
+  const { update: updateSession } = useSession()
+  const router = useRouter()
   const [logo, setLogo] = useState<string | null>(currentLogo)
   const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
@@ -32,6 +36,9 @@ export function TenantLogoUpload({ currentLogo }: Props) {
         title: "Sucesso",
         description: url ? "Logo atualizada com sucesso" : "Logo removida com sucesso",
       })
+      // Atualizar a sessao para refletir a nova logo no sidebar
+      await updateSession({ tenantLogo: url })
+      router.refresh()
     }
 
     setIsSaving(false)

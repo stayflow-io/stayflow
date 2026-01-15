@@ -36,12 +36,14 @@ export default function DashboardLayout({
     <div className="h-screen flex overflow-hidden">
       <Sidebar
         tenantName={session?.user?.tenantName}
+        tenantLogo={session?.user?.tenantLogo}
         userName={session?.user?.name}
       />
       <MobileNav
         isOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         tenantName={session?.user?.tenantName}
+        tenantLogo={session?.user?.tenantLogo}
         userName={session?.user?.name}
       />
       <div className="flex-1 flex flex-col min-w-0">

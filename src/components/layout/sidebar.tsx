@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
@@ -31,18 +32,36 @@ const menuItems = [
 
 interface SidebarProps {
   tenantName?: string
+  tenantLogo?: string | null
   userName?: string
 }
 
-export function Sidebar({ tenantName, userName }: SidebarProps) {
+export function Sidebar({ tenantName, tenantLogo, userName }: SidebarProps) {
   const pathname = usePathname()
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r bg-card flex-shrink-0">
       <div className="p-6 flex-shrink-0">
-        <h1 className="text-xl font-bold">StayFlow</h1>
-        {tenantName && (
-          <p className="text-sm text-muted-foreground mt-1">{tenantName}</p>
+        {tenantLogo ? (
+          <div className="flex flex-col items-start gap-2">
+            <Image
+              src={tenantLogo}
+              alt={tenantName || "Logo"}
+              width={120}
+              height={40}
+              className="object-contain max-h-10"
+            />
+            {tenantName && (
+              <p className="text-sm text-muted-foreground">{tenantName}</p>
+            )}
+          </div>
+        ) : (
+          <>
+            <h1 className="text-xl font-bold">StayFlow</h1>
+            {tenantName && (
+              <p className="text-sm text-muted-foreground mt-1">{tenantName}</p>
+            )}
+          </>
         )}
       </div>
       <Separator />

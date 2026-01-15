@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import { FileDown, Loader2 } from "lucide-react"
 import { generateOwnerReport, generateReservationsReport } from "@/lib/pdf"
@@ -24,11 +25,17 @@ interface ReservationsReportButtonProps {
 type PDFExportButtonProps = OwnerReportButtonProps | ReservationsReportButtonProps
 
 export function PDFExportButton(props: PDFExportButtonProps) {
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
 
   async function handleExport() {
     setIsLoading(true)
     try {
+      const reportOptions = {
+        tenantName: session?.user?.tenantName,
+        tenantLogo: session?.user?.tenantLogo,
+      }
+
       if (props.type === "owner") {
         const data = await getOwnerReportData(
           props.ownerId,
@@ -36,7 +43,7 @@ export function PDFExportButton(props: PDFExportButtonProps) {
           props.periodEnd
         )
         if (data) {
-          const doc = generateOwnerReport(data)
+          const doc = await generateOwnerReport(data, reportOptions)
           doc.save(`relatorio-${props.ownerName.toLowerCase().replace(/\s+/g, "-")}.pdf`)
         }
       } else {
@@ -45,7 +52,7 @@ export function PDFExportButton(props: PDFExportButtonProps) {
           props.periodEnd
         )
         if (data) {
-          const doc = generateReservationsReport(data)
+          const doc = await generateReservationsReport(data, reportOptions)
           doc.save("relatorio-reservas.pdf")
         }
       }

@@ -41,17 +41,28 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           role: user.role,
           tenantId: user.tenantId,
           tenantName: user.tenant.name,
+          tenantLogo: user.tenant.logo,
         }
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id
         token.role = user.role
         token.tenantId = user.tenantId
         token.tenantName = user.tenantName
+        token.tenantLogo = user.tenantLogo
+      }
+      // Permitir atualização da sessão via update()
+      if (trigger === "update" && session) {
+        if (session.tenantLogo !== undefined) {
+          token.tenantLogo = session.tenantLogo
+        }
+        if (session.tenantName !== undefined) {
+          token.tenantName = session.tenantName
+        }
       }
       return token
     },
@@ -61,6 +72,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.role = token.role as string
         session.user.tenantId = token.tenantId as string
         session.user.tenantName = token.tenantName as string
+        session.user.tenantLogo = token.tenantLogo as string | null
       }
       return session
     },

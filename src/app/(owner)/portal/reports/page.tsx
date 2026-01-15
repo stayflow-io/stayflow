@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -10,6 +11,7 @@ import { generateOwnerReport } from "@/lib/pdf"
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns"
 
 export default function OwnerReportsPage() {
+  const { data: session } = useSession()
   const [isLoading, setIsLoading] = useState(false)
   const [selectedPeriod, setSelectedPeriod] = useState("last-month")
 
@@ -65,7 +67,12 @@ export default function OwnerReportsPage() {
             })),
           }))
 
-          const doc = generateOwnerReport(data)
+          const reportOptions = {
+            tenantName: session?.user?.tenantName,
+            tenantLogo: session?.user?.tenantLogo,
+          }
+
+          const doc = await generateOwnerReport(data, reportOptions)
           doc.save(`relatorio-${format(data.periodStart, "yyyy-MM")}.pdf`)
         }
       }

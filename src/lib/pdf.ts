@@ -1,7 +1,63 @@
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { format } from "date-fns"
-import { ptBR } from "date-fns/locale"
+
+interface ReportOptions {
+  tenantName?: string
+  tenantLogo?: string | null
+}
+
+// Helper para adicionar header com logo nos PDFs
+async function addReportHeader(
+  doc: jsPDF,
+  title: string,
+  options?: ReportOptions
+): Promise<number> {
+  let yPosition = 14
+  const pageWidth = doc.internal.pageSize.getWidth()
+
+  // Se tiver logo, adiciona ela
+  if (options?.tenantLogo) {
+    try {
+      // Baixa a imagem e converte para base64
+      const response = await fetch(options.tenantLogo)
+      const blob = await response.blob()
+      const base64 = await blobToBase64(blob)
+
+      // Adiciona a logo (max 40x15mm para manter proporcao)
+      doc.addImage(base64, "PNG", 14, yPosition, 40, 15)
+      yPosition = 32
+    } catch (error) {
+      // Se falhar, usa texto
+      doc.setFontSize(20)
+      doc.setFont("helvetica", "bold")
+      doc.text(options?.tenantName || "StayFlow", 14, 20)
+      yPosition = 28
+    }
+  } else {
+    // Sem logo, usa o nome do tenant ou StayFlow
+    doc.setFontSize(20)
+    doc.setFont("helvetica", "bold")
+    doc.text(options?.tenantName || "StayFlow", 14, 20)
+    yPosition = 28
+  }
+
+  // Titulo do relatorio
+  doc.setFontSize(16)
+  doc.setFont("helvetica", "bold")
+  doc.text(title, 14, yPosition)
+
+  return yPosition + 10
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 interface FinancialReportData {
   ownerName: string
@@ -38,29 +94,28 @@ interface FinancialReportData {
   netAmount: number
 }
 
-export function generateOwnerReport(data: FinancialReportData): jsPDF {
+export async function generateOwnerReport(
+  data: FinancialReportData,
+  options?: ReportOptions
+): Promise<jsPDF> {
   const doc = new jsPDF()
   const pageWidth = doc.internal.pageSize.getWidth()
 
-  // Header
-  doc.setFontSize(20)
-  doc.setFont("helvetica", "bold")
-  doc.text("StayFlow", 14, 20)
-
-  doc.setFontSize(16)
-  doc.text("Relatorio Financeiro", 14, 30)
+  // Header com logo
+  let yPosition = await addReportHeader(doc, "Relatorio Financeiro", options)
 
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
-  doc.text(`Proprietario: ${data.ownerName}`, 14, 40)
+  doc.text(`Proprietario: ${data.ownerName}`, 14, yPosition)
+  yPosition += 6
   doc.text(
     `Periodo: ${format(data.periodStart, "dd/MM/yyyy")} a ${format(data.periodEnd, "dd/MM/yyyy")}`,
     14,
-    46
+    yPosition
   )
-  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 52)
-
-  let yPosition = 62
+  yPosition += 6
+  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, yPosition)
+  yPosition += 10
 
   // Properties and their units
   for (const property of data.properties) {
@@ -238,29 +293,29 @@ interface ReservationsReportData {
   }
 }
 
-export function generateReservationsReport(data: ReservationsReportData): jsPDF {
+export async function generateReservationsReport(
+  data: ReservationsReportData,
+  options?: ReportOptions
+): Promise<jsPDF> {
   const doc = new jsPDF("landscape")
 
-  // Header
-  doc.setFontSize(20)
-  doc.setFont("helvetica", "bold")
-  doc.text("StayFlow", 14, 20)
-
-  doc.setFontSize(16)
-  doc.text("Relatorio de Reservas", 14, 30)
+  // Header com logo
+  let yPosition = await addReportHeader(doc, "Relatorio de Reservas", options)
 
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
   doc.text(
     `Periodo: ${format(data.periodStart, "dd/MM/yyyy")} a ${format(data.periodEnd, "dd/MM/yyyy")}`,
     14,
-    40
+    yPosition
   )
-  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 46)
+  yPosition += 6
+  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, yPosition)
+  yPosition += 10
 
   // Table
   autoTable(doc, {
-    startY: 56,
+    startY: yPosition,
     head: [["Imovel", "Hospede", "Check-in", "Check-out", "Noites", "Valor", "Status"]],
     body: data.reservations.map((r) => [
       r.property,
@@ -307,29 +362,29 @@ interface FinancialTransactionsReportData {
   }
 }
 
-export function generateFinancialTransactionsReport(data: FinancialTransactionsReportData): jsPDF {
+export async function generateFinancialTransactionsReport(
+  data: FinancialTransactionsReportData,
+  options?: ReportOptions
+): Promise<jsPDF> {
   const doc = new jsPDF("landscape")
 
-  // Header
-  doc.setFontSize(20)
-  doc.setFont("helvetica", "bold")
-  doc.text("StayFlow", 14, 20)
-
-  doc.setFontSize(16)
-  doc.text("Relatorio Financeiro", 14, 30)
+  // Header com logo
+  let yPosition = await addReportHeader(doc, "Relatorio Financeiro", options)
 
   doc.setFontSize(10)
   doc.setFont("helvetica", "normal")
   doc.text(
     `Periodo: ${format(data.periodStart, "dd/MM/yyyy")} a ${format(data.periodEnd, "dd/MM/yyyy")}`,
     14,
-    40
+    yPosition
   )
-  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, 46)
+  yPosition += 6
+  doc.text(`Gerado em: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 14, yPosition)
+  yPosition += 10
 
   // Table
   autoTable(doc, {
-    startY: 56,
+    startY: yPosition,
     head: [["Data", "Tipo", "Categoria", "Imovel", "Descricao", "Valor"]],
     body: data.transactions.map((t) => [
       format(t.date, "dd/MM/yyyy"),

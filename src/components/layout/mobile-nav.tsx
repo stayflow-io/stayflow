@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import {
@@ -32,10 +33,11 @@ interface MobileNavProps {
   isOpen: boolean
   onClose: () => void
   tenantName?: string
+  tenantLogo?: string | null
   userName?: string
 }
 
-export function MobileNav({ isOpen, onClose, tenantName, userName }: MobileNavProps) {
+export function MobileNav({ isOpen, onClose, tenantName, tenantLogo, userName }: MobileNavProps) {
   const pathname = usePathname()
 
   if (!isOpen) return null
@@ -46,9 +48,26 @@ export function MobileNav({ isOpen, onClose, tenantName, userName }: MobileNavPr
       <div className="fixed inset-y-0 left-0 w-64 bg-card flex flex-col">
         <div className="p-6 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">StayFlow</h1>
-            {tenantName && (
-              <p className="text-sm text-muted-foreground mt-1">{tenantName}</p>
+            {tenantLogo ? (
+              <div className="flex flex-col items-start gap-1">
+                <Image
+                  src={tenantLogo}
+                  alt={tenantName || "Logo"}
+                  width={100}
+                  height={36}
+                  className="object-contain max-h-9"
+                />
+                {tenantName && (
+                  <p className="text-sm text-muted-foreground">{tenantName}</p>
+                )}
+              </div>
+            ) : (
+              <>
+                <h1 className="text-xl font-bold">StayFlow</h1>
+                {tenantName && (
+                  <p className="text-sm text-muted-foreground mt-1">{tenantName}</p>
+                )}
+              </>
             )}
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
