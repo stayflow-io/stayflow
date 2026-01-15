@@ -31,7 +31,11 @@ export async function GET(request: Request) {
   const reservations = await prisma.reservation.findMany({
     where,
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
       channel: true,
     },
     orderBy: { checkinDate: "desc" },
@@ -50,7 +54,7 @@ export async function GET(request: Request) {
     Hospede: r.guestName,
     Email: r.guestEmail || "",
     Telefone: r.guestPhone || "",
-    Imovel: r.property.name,
+    Imovel: `${r.unit.property.name} - ${r.unit.name}`,
     Checkin: format(new Date(r.checkinDate), "dd/MM/yyyy", { locale: ptBR }),
     Checkout: format(new Date(r.checkoutDate), "dd/MM/yyyy", { locale: ptBR }),
     Hospedes: r.numGuests,

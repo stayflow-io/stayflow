@@ -1,5 +1,6 @@
 "use client"
 
+import { useMemo, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   Select,
@@ -14,6 +15,7 @@ import { X } from "lucide-react"
 interface Property {
   id: string
   name: string
+  ownerId: string | null
 }
 
 interface Owner {
@@ -33,6 +35,24 @@ export function ReservationsFilters({ properties, owners }: Props) {
   const status = searchParams.get("status") || ""
   const propertyId = searchParams.get("property") || ""
   const ownerId = searchParams.get("owner") || ""
+
+  // Filtra propriedades com base no proprietário selecionado
+  const filteredProperties = useMemo(() => {
+    if (!ownerId) return properties
+    return properties.filter((p) => p.ownerId === ownerId)
+  }, [properties, ownerId])
+
+  // Limpa a propriedade selecionada se não pertencer ao proprietário
+  useEffect(() => {
+    if (ownerId && propertyId) {
+      const property = properties.find((p) => p.id === propertyId)
+      if (property && property.ownerId !== ownerId) {
+        const params = new URLSearchParams(searchParams.toString())
+        params.delete("property")
+        router.push(`/reservations?${params.toString()}`)
+      }
+    }
+  }, [ownerId, propertyId, properties, searchParams, router])
 
   function updateFilter(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString())
@@ -85,7 +105,7 @@ export function ReservationsFilters({ properties, owners }: Props) {
           <SelectValue placeholder="Todos os imoveis" />
         </SelectTrigger>
         <SelectContent>
-          {properties.map((property) => (
+          {filteredProperties.map((property) => (
             <SelectItem key={property.id} value={property.id}>
               {property.name}
             </SelectItem>

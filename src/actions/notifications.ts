@@ -48,7 +48,11 @@ export async function getNotifications(): Promise<Notification[]> {
             },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { name: true } },
+              },
+            },
           },
           orderBy: {
             checkinDate: "asc",
@@ -65,7 +69,11 @@ export async function getNotifications(): Promise<Notification[]> {
             },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { name: true } },
+              },
+            },
           },
           orderBy: {
             checkoutDate: "asc",
@@ -82,7 +90,11 @@ export async function getNotifications(): Promise<Notification[]> {
             },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { name: true } },
+              },
+            },
           },
           orderBy: {
             checkinDate: "asc",
@@ -98,7 +110,11 @@ export async function getNotifications(): Promise<Notification[]> {
             },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { name: true } },
+              },
+            },
           },
           orderBy: {
             scheduledDate: "asc",
@@ -116,7 +132,11 @@ export async function getNotifications(): Promise<Notification[]> {
             },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { name: true } },
+              },
+            },
           },
           orderBy: {
             scheduledDate: "asc",
@@ -146,7 +166,7 @@ export async function getNotifications(): Promise<Notification[]> {
           id: `checkin-${reservation.id}`,
           type: "checkin",
           title: "Check-in hoje",
-          description: `${reservation.guestName} em ${reservation.property.name}`,
+          description: `${reservation.guestName} em ${reservation.unit.property.name} - ${reservation.unit.name}`,
           href: `/reservations/${reservation.id}`,
           priority: "high",
           date: reservation.checkinDate,
@@ -159,7 +179,7 @@ export async function getNotifications(): Promise<Notification[]> {
           id: `checkout-${reservation.id}`,
           type: "checkout",
           title: "Check-out hoje",
-          description: `${reservation.guestName} em ${reservation.property.name}`,
+          description: `${reservation.guestName} em ${reservation.unit.property.name} - ${reservation.unit.name}`,
           href: `/reservations/${reservation.id}`,
           priority: "high",
           date: reservation.checkoutDate,
@@ -172,7 +192,7 @@ export async function getNotifications(): Promise<Notification[]> {
           id: `checkin-tomorrow-${reservation.id}`,
           type: "checkin",
           title: "Check-in amanha",
-          description: `${reservation.guestName} em ${reservation.property.name}`,
+          description: `${reservation.guestName} em ${reservation.unit.property.name} - ${reservation.unit.name}`,
           href: `/reservations/${reservation.id}`,
           priority: "medium",
           date: reservation.checkinDate,
@@ -185,7 +205,7 @@ export async function getNotifications(): Promise<Notification[]> {
           id: `task-overdue-${task.id}`,
           type: "task",
           title: "Tarefa atrasada",
-          description: `${task.title} - ${task.property.name}`,
+          description: `${task.title} - ${task.unit.property.name} - ${task.unit.name}`,
           href: `/tasks/${task.id}`,
           priority: "high",
           date: task.scheduledDate,
@@ -198,7 +218,7 @@ export async function getNotifications(): Promise<Notification[]> {
           id: `task-today-${task.id}`,
           type: "task",
           title: "Tarefa para hoje",
-          description: `${task.title} - ${task.property.name}`,
+          description: `${task.title} - ${task.unit.property.name} - ${task.unit.name}`,
           href: `/tasks/${task.id}`,
           priority: "medium",
           date: task.scheduledDate,

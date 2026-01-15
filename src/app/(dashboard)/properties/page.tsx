@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, MapPin, Users, Bed, Bath } from "lucide-react"
+import { Plus, MapPin, Building2, Home, User } from "lucide-react"
 import { getProperties } from "@/actions/properties"
 import { getOwners } from "@/actions/owners"
 import { PropertiesFilters } from "./properties-filters"
@@ -59,48 +59,58 @@ export default async function PropertiesPage({ searchParams }: Props) {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {properties.map((property) => (
-              <Link key={property.id} href={`/properties/${property.id}`}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-lg">{property.name}</CardTitle>
-                      <Badge variant={property.status === "ACTIVE" ? "default" : "secondary"}>
-                        {property.status === "ACTIVE" ? "Ativo" : property.status === "INACTIVE" ? "Inativo" : "Manutencao"}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center text-sm text-muted-foreground">
-                      <MapPin className="h-3 w-3 mr-1" />
-                      {property.city}, {property.state}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center" title="Quartos">
-                        <Bed className="h-4 w-4 mr-1" />
-                        {property.bedrooms}<span className="hidden sm:inline ml-1">quartos</span>
+            {properties.map((property) => {
+              // Calculate totals from units
+              const totalUnits = property._count.units
+              const activeUnits = property.units?.filter(u => u.status === "ACTIVE").length || 0
+
+              return (
+                <Link key={property.id} href={`/properties/${property.id}`}>
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-lg">{property.name}</CardTitle>
+                        <Badge variant={property.status === "ACTIVE" ? "default" : "secondary"}>
+                          {property.status === "ACTIVE" ? "Ativo" : property.status === "INACTIVE" ? "Inativo" : "Manutencao"}
+                        </Badge>
                       </div>
-                      <div className="flex items-center" title="Banheiros">
-                        <Bath className="h-4 w-4 mr-1" />
-                        {property.bathrooms}<span className="hidden sm:inline ml-1">banhos</span>
+                      <div className="flex items-center text-sm text-muted-foreground">
+                        <MapPin className="h-3 w-3 mr-1" />
+                        {property.city}, {property.state}
                       </div>
-                      <div className="flex items-center" title="Hóspedes">
-                        <Users className="h-4 w-4 mr-1" />
-                        {property.maxGuests}<span className="hidden sm:inline ml-1">hospedes</span>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-3 sm:gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center" title="Unidades">
+                          <Home className="h-4 w-4 mr-1" />
+                          {totalUnits}<span className="hidden sm:inline ml-1">unidade{totalUnits !== 1 ? "s" : ""}</span>
+                        </div>
+                        <div className="flex items-center" title="Unidades Ativas">
+                          <Building2 className="h-4 w-4 mr-1" />
+                          {activeUnits}<span className="hidden sm:inline ml-1">ativa{activeUnits !== 1 ? "s" : ""}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="mt-3 pt-3 border-t flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Proprietario:</span>
-                      <span className="font-medium">{property.owner.name}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm mt-1">
-                      <span className="text-muted-foreground">Reservas:</span>
-                      <span className="font-medium">{property._count.reservations}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground flex items-center">
+                          <User className="h-3 w-3 mr-1" />
+                          Proprietario:
+                        </span>
+                        <span className="font-medium">
+                          {property.owner?.name || "Nenhum"}
+                        </span>
+                      </div>
+                      {property.units && property.units.length > 0 && (
+                        <div className="mt-2 text-xs text-muted-foreground">
+                          <span>Unidades: </span>
+                          {property.units.slice(0, 3).map(u => u.name).join(", ")}
+                          {property.units.length > 3 && ` +${property.units.length - 3}`}
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              )
+            })}
           </div>
 
           <Pagination

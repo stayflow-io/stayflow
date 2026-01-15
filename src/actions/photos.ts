@@ -8,7 +8,7 @@ import { join } from "path"
 import { existsSync } from "fs"
 import { cache, cacheKeys } from "@/lib/redis"
 
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads", "properties")
+const UPLOAD_DIR = join(process.cwd(), "public", "uploads", "units")
 
 async function ensureUploadDir() {
   if (!existsSync(UPLOAD_DIR)) {
@@ -16,7 +16,7 @@ async function ensureUploadDir() {
   }
 }
 
-export async function uploadPropertyPhoto(propertyId: string, formData: FormData) {
+export async function uploadUnitPhoto(unitId: string, formData: FormData) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
@@ -36,13 +36,14 @@ export async function uploadPropertyPhoto(propertyId: string, formData: FormData
     return { error: "Arquivo muito grande. Maximo 5MB." }
   }
 
-  // Verify property belongs to tenant
-  const property = await prisma.property.findFirst({
-    where: { id: propertyId, tenantId: session.user.tenantId },
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: { id: unitId, property: { tenantId: session.user.tenantId } },
+    include: { property: true },
   })
 
-  if (!property) {
-    return { error: "Imovel nao encontrado" }
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   try {
@@ -50,7 +51,7 @@ export async function uploadPropertyPhoto(propertyId: string, formData: FormData
 
     // Generate unique filename
     const ext = file.name.split(".").pop()
-    const filename = `${propertyId}-${Date.now()}.${ext}`
+    const filename = `${unitId}-${Date.now()}.${ext}`
     const filepath = join(UPLOAD_DIR, filename)
 
     // Write file
@@ -59,26 +60,30 @@ export async function uploadPropertyPhoto(propertyId: string, formData: FormData
     await writeFile(filepath, buffer)
 
     // Get current max order
-    const maxOrder = await prisma.propertyPhoto.aggregate({
-      where: { propertyId },
+    const maxOrder = await prisma.unitPhoto.aggregate({
+      where: { unitId },
       _max: { order: true },
     })
 
     const newOrder = (maxOrder._max.order || 0) + 1
 
     // Save to database
-    const photo = await prisma.propertyPhoto.create({
+    const photo = await prisma.unitPhoto.create({
       data: {
-        propertyId,
-        url: `/uploads/properties/${filename}`,
+        unitId,
+        url: `/uploads/units/${filename}`,
         order: newOrder,
       },
     })
 
-    // Invalidar cache do imóvel
-    await cache.del(cacheKeys.property(propertyId))
+    // Invalidar cache da unidade e propriedade
+    await Promise.all([
+      cache.del(cacheKeys.unit(unitId)),
+      cache.del(cacheKeys.property(unit.propertyId)),
+    ])
 
-    revalidatePath(`/properties/${propertyId}`)
+    revalidatePath(`/properties/${unit.propertyId}`)
+    revalidatePath(`/properties/${unit.propertyId}/units/${unitId}`)
     return { success: true, photo }
   } catch (error) {
     console.error("Error uploading photo:", error)
@@ -86,16 +91,16 @@ export async function uploadPropertyPhoto(propertyId: string, formData: FormData
   }
 }
 
-export async function deletePropertyPhoto(photoId: string) {
+export async function deleteUnitPhoto(photoId: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  const photo = await prisma.propertyPhoto.findFirst({
+  const photo = await prisma.unitPhoto.findFirst({
     where: { id: photoId },
-    include: { property: true },
+    include: { unit: { include: { property: true } } },
   })
 
-  if (!photo || photo.property.tenantId !== session.user.tenantId) {
+  if (!photo || photo.unit.property.tenantId !== session.user.tenantId) {
     return { error: "Foto nao encontrada" }
   }
 
@@ -107,14 +112,18 @@ export async function deletePropertyPhoto(photoId: string) {
     }
 
     // Delete from database
-    await prisma.propertyPhoto.delete({
+    await prisma.unitPhoto.delete({
       where: { id: photoId },
     })
 
-    // Invalidar cache do imóvel
-    await cache.del(cacheKeys.property(photo.propertyId))
+    // Invalidar cache da unidade e propriedade
+    await Promise.all([
+      cache.del(cacheKeys.unit(photo.unitId)),
+      cache.del(cacheKeys.property(photo.unit.propertyId)),
+    ])
 
-    revalidatePath(`/properties/${photo.propertyId}`)
+    revalidatePath(`/properties/${photo.unit.propertyId}`)
+    revalidatePath(`/properties/${photo.unit.propertyId}/units/${photo.unitId}`)
     return { success: true }
   } catch (error) {
     console.error("Error deleting photo:", error)
@@ -122,34 +131,39 @@ export async function deletePropertyPhoto(photoId: string) {
   }
 }
 
-export async function reorderPropertyPhotos(propertyId: string, photoIds: string[]) {
+export async function reorderUnitPhotos(unitId: string, photoIds: string[]) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  // Verify property belongs to tenant
-  const property = await prisma.property.findFirst({
-    where: { id: propertyId, tenantId: session.user.tenantId },
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: { id: unitId, property: { tenantId: session.user.tenantId } },
+    include: { property: true },
   })
 
-  if (!property) {
-    return { error: "Imovel nao encontrado" }
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   try {
     // Update order for each photo
     await Promise.all(
       photoIds.map((photoId, index) =>
-        prisma.propertyPhoto.update({
+        prisma.unitPhoto.update({
           where: { id: photoId },
           data: { order: index + 1 },
         })
       )
     )
 
-    // Invalidar cache do imóvel
-    await cache.del(cacheKeys.property(propertyId))
+    // Invalidar cache da unidade e propriedade
+    await Promise.all([
+      cache.del(cacheKeys.unit(unitId)),
+      cache.del(cacheKeys.property(unit.propertyId)),
+    ])
 
-    revalidatePath(`/properties/${propertyId}`)
+    revalidatePath(`/properties/${unit.propertyId}`)
+    revalidatePath(`/properties/${unit.propertyId}/units/${unitId}`)
     return { success: true }
   } catch (error) {
     console.error("Error reordering photos:", error)
@@ -157,12 +171,18 @@ export async function reorderPropertyPhotos(propertyId: string, photoIds: string
   }
 }
 
-export async function getPropertyPhotos(propertyId: string) {
+export async function getUnitPhotos(unitId: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  return prisma.propertyPhoto.findMany({
-    where: { propertyId },
+  return prisma.unitPhoto.findMany({
+    where: { unitId },
     orderBy: { order: "asc" },
   })
 }
+
+// Legacy aliases for backwards compatibility during migration
+export const uploadPropertyPhoto = uploadUnitPhoto
+export const deletePropertyPhoto = deleteUnitPhoto
+export const reorderPropertyPhotos = reorderUnitPhotos
+export const getPropertyPhotos = getUnitPhotos

@@ -113,7 +113,7 @@ export default async function TasksPage({ searchParams }: Props) {
                           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground mt-1">
                             <span className="flex items-center">
                               <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                              <span className="truncate max-w-[100px] sm:max-w-none">{task.property.name}</span>
+                              <span className="truncate max-w-[100px] sm:max-w-none">{task.unit?.property.name} - {task.unit?.name}</span>
                             </span>
                             <span className="flex items-center">
                               <Calendar className="h-3 w-3 mr-1 flex-shrink-0" />

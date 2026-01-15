@@ -14,6 +14,28 @@ async function getOwnerData(userId: string) {
       properties: {
         where: { deletedAt: null },
         include: {
+          units: {
+            where: { deletedAt: null },
+            include: {
+              reservations: {
+                where: {
+                  status: { in: ["CONFIRMED", "CHECKED_IN"] },
+                  checkoutDate: { gte: new Date() },
+                },
+                orderBy: { checkinDate: "asc" },
+                take: 5,
+              },
+            },
+          },
+          _count: {
+            select: { units: true },
+          },
+        },
+      },
+      units: {
+        where: { deletedAt: null },
+        include: {
+          property: true,
           reservations: {
             where: {
               status: { in: ["CONFIRMED", "CHECKED_IN"] },
@@ -21,9 +43,6 @@ async function getOwnerData(userId: string) {
             },
             orderBy: { checkinDate: "asc" },
             take: 5,
-          },
-          _count: {
-            select: { reservations: true },
           },
         },
       },
@@ -36,28 +55,47 @@ async function getOwnerData(userId: string) {
 
   if (!owner) return null
 
-  // Calculate totals
-  const totalProperties = owner.properties.length
+  // Calculate totals - count all units belonging to this owner
+  const totalUnits = owner.units.length + owner.properties.reduce(
+    (sum, p) => sum + p.units.filter(u => u.ownerId === null).length,
+    0
+  )
   const pendingPayouts = owner.payouts.filter((p) => p.status === "PENDING").length
   const totalPaidOut = owner.payouts
     .filter((p) => p.status === "PAID")
     .reduce((sum, p) => sum + Number(p.netAmount), 0)
 
-  // Get upcoming reservations across all properties
-  const upcomingReservations = owner.properties
-    .flatMap((p) =>
-      p.reservations.map((r) => ({
-        ...r,
-        propertyName: p.name,
-      }))
-    )
+  // Get upcoming reservations across all units
+  // From units directly owned
+  const directUnitReservations = owner.units.flatMap((u) =>
+    u.reservations.map((r) => ({
+      ...r,
+      propertyName: u.property.name,
+      unitName: u.name,
+    }))
+  )
+
+  // From units inherited from properties (where unit.ownerId is null)
+  const inheritedUnitReservations = owner.properties.flatMap((p) =>
+    p.units
+      .filter((u) => u.ownerId === null)
+      .flatMap((u) =>
+        u.reservations.map((r) => ({
+          ...r,
+          propertyName: p.name,
+          unitName: u.name,
+        }))
+      )
+  )
+
+  const upcomingReservations = [...directUnitReservations, ...inheritedUnitReservations]
     .sort((a, b) => a.checkinDate.getTime() - b.checkinDate.getTime())
     .slice(0, 5)
 
   return {
     owner,
     stats: {
-      totalProperties,
+      totalUnits,
       pendingPayouts,
       totalPaidOut,
       upcomingReservations,
@@ -103,12 +141,12 @@ export default async function OwnerPortalPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Meus Imoveis</CardTitle>
+            <CardTitle className="text-sm font-medium">Minhas Unidades</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProperties}</div>
-            <p className="text-xs text-muted-foreground">imoveis ativos</p>
+            <div className="text-2xl font-bold">{stats.totalUnits}</div>
+            <p className="text-xs text-muted-foreground">unidades ativas</p>
           </CardContent>
         </Card>
 
@@ -155,7 +193,7 @@ export default async function OwnerPortalPage() {
         <Card>
           <CardHeader>
             <CardTitle>Proximas Reservas</CardTitle>
-            <CardDescription>Reservas confirmadas nos seus imoveis</CardDescription>
+            <CardDescription>Reservas confirmadas nas suas unidades</CardDescription>
           </CardHeader>
           <CardContent>
             {stats.upcomingReservations.length === 0 ? (
@@ -172,7 +210,7 @@ export default async function OwnerPortalPage() {
                     <div>
                       <p className="font-medium">{reservation.guestName}</p>
                       <p className="text-sm text-muted-foreground">
-                        {reservation.propertyName}
+                        {reservation.propertyName} - {reservation.unitName}
                       </p>
                     </div>
                     <div className="text-right">

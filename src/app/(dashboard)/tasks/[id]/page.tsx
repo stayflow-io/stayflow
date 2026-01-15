@@ -57,7 +57,7 @@ export default async function TaskDetailPage({ params }: Props) {
             </div>
             <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
               <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
-              <span className="truncate">{task.property.name}</span>
+              <span className="truncate">{task.unit.property.name} - {task.unit.name}</span>
             </div>
           </div>
         </div>
@@ -151,12 +151,12 @@ export default async function TaskDetailPage({ params }: Props) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="font-medium">{task.property.name}</p>
+              <p className="font-medium">{task.unit.property.name} - {task.unit.name}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                {task.property.city}, {task.property.state}
+                {task.unit.property.city}, {task.unit.property.state}
               </p>
               <Button variant="link" className="px-0 mt-2" asChild>
-                <Link href={`/properties/${task.property.id}`}>
+                <Link href={`/properties/${task.unit.property.id}`}>
                   Ver imovel
                 </Link>
               </Button>

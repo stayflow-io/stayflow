@@ -73,6 +73,10 @@ export const cacheKeys = {
   properties: (tenantId: string) => `properties:list:${tenantId}`,
   property: (id: string) => `properties:${id}`,
 
+  // Units
+  units: (tenantId: string) => `units:list:${tenantId}`,
+  unit: (id: string) => `units:${id}`,
+
   // Owners
   owners: (tenantId: string) => `owners:list:${tenantId}`,
   owner: (id: string) => `owners:${id}`,
@@ -81,8 +85,8 @@ export const cacheKeys = {
   reservations: (tenantId: string, month: string) => `reservations:${tenantId}:${month}`,
 
   // Calendar
-  calendar: (tenantId: string, start: string, end: string, propertyId?: string) =>
-    `calendar:${tenantId}:${start}:${end}:${propertyId || 'all'}`,
+  calendar: (tenantId: string, start: string, end: string, filters?: { propertyId?: string; unitId?: string }) =>
+    `calendar:${tenantId}:${start}:${end}:${filters?.propertyId || 'all'}:${filters?.unitId || 'all'}`,
 
   // Notifications
   notifications: (tenantId: string) => `notifications:${tenantId}`,
@@ -94,6 +98,7 @@ export const cacheKeys = {
   // Invalidation patterns
   tenantPattern: (tenantId: string) => `*:${tenantId}*`,
   calendarPattern: (tenantId: string) => `calendar:${tenantId}:*`,
+  unitsPattern: (tenantId: string) => `units:*:${tenantId}*`,
 }
 
 // TTL constants (in seconds)

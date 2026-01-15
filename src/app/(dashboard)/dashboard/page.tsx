@@ -2,7 +2,7 @@ import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Building2, CalendarCheck, ClipboardList, DollarSign, AlertCircle, LogIn, LogOut, TrendingUp, BarChart3, PieChart, Sparkles } from "lucide-react"
-import { getDashboardStats, getRevenueByMonth, getOccupancyByProperty, getReservationsByStatus } from "@/actions/dashboard"
+import { getDashboardStats, getRevenueByMonth, getOccupancyByUnit, getReservationsByStatus } from "@/actions/dashboard"
 import { getRevenueForecast } from "@/actions/reports"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
   const [data, revenueData, occupancyData, statusData, forecastData] = await Promise.all([
     getDashboardStats(),
     getRevenueByMonth(),
-    getOccupancyByProperty(),
+    getOccupancyByUnit(),
     getReservationsByStatus(),
     getRevenueForecast(),
   ])
@@ -107,14 +107,14 @@ export default async function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Imoveis Ativos
+              Unidades Ativas
             </CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{data.propertiesCount}</div>
+            <div className="text-2xl font-bold">{data.unitsCount}</div>
             <p className="text-xs text-muted-foreground">
-              imoveis cadastrados
+              unidades cadastradas
             </p>
           </CardContent>
         </Card>
@@ -254,7 +254,7 @@ export default async function DashboardPage() {
                     <div>
                       <p className="font-medium">{reservation.guestName}</p>
                       <p className="text-sm text-muted-foreground">
-                        {reservation.property.name}
+                        {reservation.unit.property.name} - {reservation.unit.name}
                       </p>
                     </div>
                     <div className="text-right">
@@ -295,7 +295,7 @@ export default async function DashboardPage() {
                     <div>
                       <p className="font-medium">{task.title}</p>
                       <p className="text-sm text-muted-foreground">
-                        {task.property?.name || "Sem imóvel"}
+                        {task.unit ? `${task.unit.property.name} - ${task.unit.name}` : "Sem unidade"}
                       </p>
                     </div>
                     <div className="text-right">

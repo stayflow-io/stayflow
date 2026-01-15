@@ -10,6 +10,7 @@ const ITEMS_PER_PAGE = 15
 
 export async function getReservations(filters?: {
   status?: string
+  unitId?: string
   propertyId?: string
   ownerId?: string
   startDate?: Date
@@ -22,20 +23,35 @@ export async function getReservations(filters?: {
   const page = filters?.page || 1
   const skip = (page - 1) * ITEMS_PER_PAGE
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     tenantId: session.user.tenantId,
+    unit: { deletedAt: null },
     ...(filters?.status && { status: filters.status as any }),
-    ...(filters?.propertyId && { propertyId: filters.propertyId }),
-    ...(filters?.ownerId && { property: { ownerId: filters.ownerId } }),
+    ...(filters?.unitId && { unitId: filters.unitId }),
+    ...(filters?.propertyId && { unit: { propertyId: filters.propertyId } }),
     ...(filters?.startDate && { checkinDate: { gte: filters.startDate } }),
     ...(filters?.endDate && { checkoutDate: { lte: filters.endDate } }),
+  }
+
+  // Filter by owner - check both unit.ownerId and unit.property.ownerId
+  if (filters?.ownerId) {
+    where.OR = [
+      { unit: { ownerId: filters.ownerId } },
+      { unit: { ownerId: null, property: { ownerId: filters.ownerId } } },
+    ]
   }
 
   const [items, total] = await Promise.all([
     prisma.reservation.findMany({
       where,
       include: {
-        property: true,
+        unit: {
+          include: {
+            property: { select: { id: true, name: true, ownerId: true } },
+            owner: { select: { id: true, name: true } },
+          },
+        },
         channel: true,
       },
       orderBy: { checkinDate: "desc" },
@@ -66,7 +82,22 @@ export async function getReservation(id: string) {
       tenantId: session.user.tenantId,
     },
     include: {
-      property: { include: { owner: true } },
+      unit: {
+        include: {
+          property: {
+            select: {
+              id: true,
+              name: true,
+              ownerId: true,
+              address: true,
+              city: true,
+              state: true,
+              owner: { select: { id: true, name: true } },
+            },
+          },
+          owner: true,
+        },
+      },
       channel: true,
       events: { orderBy: { createdAt: "desc" } },
       tasks: true,
@@ -79,7 +110,7 @@ export async function createReservation(formData: FormData) {
   if (!session?.user) throw new Error("Unauthorized")
 
   const rawData = {
-    propertyId: formData.get("propertyId"),
+    unitId: formData.get("unitId"),
     guestName: formData.get("guestName"),
     guestEmail: formData.get("guestEmail") || undefined,
     guestPhone: formData.get("guestPhone") || undefined,
@@ -96,6 +127,19 @@ export async function createReservation(formData: FormData) {
 
   if (!validated.success) {
     return { error: validated.error.errors[0].message }
+  }
+
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: validated.data.unitId,
+      property: { tenantId: session.user.tenantId },
+      deletedAt: null,
+    },
+  })
+
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   const netAmount =
@@ -139,7 +183,7 @@ export async function updateReservation(id: string, formData: FormData) {
   if (!session?.user) throw new Error("Unauthorized")
 
   const rawData = {
-    propertyId: formData.get("propertyId"),
+    unitId: formData.get("unitId"),
     guestName: formData.get("guestName"),
     guestEmail: formData.get("guestEmail") || undefined,
     guestPhone: formData.get("guestPhone") || undefined,
@@ -217,7 +261,7 @@ export async function updateReservationStatus(id: string, status: string) {
     await prisma.task.create({
       data: {
         tenantId: session.user.tenantId,
-        propertyId: reservation.propertyId,
+        unitId: reservation.unitId,
         reservationId: id,
         type: "CLEANING",
         title: "Limpeza pos-checkout",

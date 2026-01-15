@@ -12,28 +12,45 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { getReservation, updateReservation } from "@/actions/reservations"
 import { getAllProperties } from "@/actions/properties"
+import { getUnits } from "@/actions/units"
+
+type Unit = {
+  id: string
+  name: string
+  maxGuests: number
+  cleaningFee: number | unknown // Decimal from Prisma
+  propertyId: string
+}
 
 type Property = {
   id: string
   name: string
-  maxGuests: number
-  cleaningFee: any
 }
 
 type Reservation = {
   id: string
-  propertyId: string
+  unitId: string
   guestName: string
   guestEmail: string | null
   guestPhone: string | null
   checkinDate: Date
   checkoutDate: Date
   numGuests: number
-  totalAmount: any
-  cleaningFee: any
-  channelFee: any
+  totalAmount: number
+  cleaningFee: number
+  channelFee: number
   notes: string | null
   status: string
+  unit: {
+    id: string
+    name: string
+    propertyId: string
+    maxGuests: number
+    property: {
+      id: string
+      name: string
+    }
+  }
 }
 
 export default function EditReservationPage({ params }: { params: { id: string } }) {
@@ -41,8 +58,10 @@ export default function EditReservationPage({ params }: { params: { id: string }
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
   const [reservation, setReservation] = useState<Reservation | null>(null)
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
+  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null)
 
   useEffect(() => {
     async function loadData() {
@@ -52,14 +71,34 @@ export default function EditReservationPage({ params }: { params: { id: string }
       ])
 
       if (reservationData) {
-        setReservation(reservationData)
-        const property = propertiesData.find((p) => p.id === reservationData.propertyId)
-        setSelectedProperty(property || null)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setReservation(reservationData as any)
+        setSelectedPropertyId(reservationData.unit.propertyId)
+        // Load units for the property
+        const unitsResult = await getUnits({ propertyId: reservationData.unit.propertyId })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const unitsList = unitsResult.items as any[]
+        setUnits(unitsList)
+        const unit = unitsList.find((u) => u.id === reservationData.unitId)
+        setSelectedUnit(unit || null)
       }
       setProperties(propertiesData)
     }
     loadData()
   }, [params.id])
+
+  async function handlePropertyChange(propertyId: string) {
+    setSelectedPropertyId(propertyId)
+    setSelectedUnit(null)
+    const unitsResult = await getUnits({ propertyId })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setUnits(unitsResult.items as any[])
+  }
+
+  function handleUnitChange(unitId: string) {
+    const unit = units.find((u) => u.id === unitId)
+    setSelectedUnit(unit || null)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -75,16 +114,11 @@ export default function EditReservationPage({ params }: { params: { id: string }
       } else if (result.error) {
         setError(result.error)
       }
-    } catch (err) {
+    } catch {
       setError("Erro ao atualizar reserva. Verifique os dados e tente novamente.")
     } finally {
       setIsLoading(false)
     }
-  }
-
-  function handlePropertyChange(propertyId: string) {
-    const property = properties.find((p) => p.id === propertyId)
-    setSelectedProperty(property || null)
   }
 
   function formatDateForInput(date: Date) {
@@ -121,7 +155,7 @@ export default function EditReservationPage({ params }: { params: { id: string }
             <CardHeader>
               <CardTitle>Imovel e Hospede</CardTitle>
               <CardDescription>
-                Dados do imovel e do hospede
+                Dados do imovel, unidade e hospede
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -134,11 +168,9 @@ export default function EditReservationPage({ params }: { params: { id: string }
               <div className="space-y-2">
                 <Label htmlFor="propertyId">Imovel *</Label>
                 <Select
-                  name="propertyId"
-                  required
-                  disabled={isLoading}
-                  defaultValue={reservation.propertyId}
+                  value={selectedPropertyId}
                   onValueChange={handlePropertyChange}
+                  disabled={isLoading}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o imovel" />
@@ -147,6 +179,28 @@ export default function EditReservationPage({ params }: { params: { id: string }
                     {properties.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unitId">Unidade *</Label>
+                <Select
+                  name="unitId"
+                  required
+                  disabled={isLoading || !selectedPropertyId}
+                  defaultValue={reservation.unitId}
+                  onValueChange={handleUnitChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedPropertyId ? "Selecione a unidade" : "Selecione um imovel primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name} (max {unit.maxGuests} hospedes)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -194,14 +248,14 @@ export default function EditReservationPage({ params }: { params: { id: string }
                   name="numGuests"
                   type="number"
                   min="1"
-                  max={selectedProperty?.maxGuests || 10}
+                  max={selectedUnit?.maxGuests || 10}
                   defaultValue={reservation.numGuests}
                   required
                   disabled={isLoading}
                 />
-                {selectedProperty && (
+                {selectedUnit && (
                   <p className="text-xs text-muted-foreground">
-                    Maximo: {selectedProperty.maxGuests} hospedes
+                    Maximo: {selectedUnit.maxGuests} hospedes
                   </p>
                 )}
               </div>

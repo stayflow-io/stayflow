@@ -12,21 +12,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { getTask, updateTask } from "@/actions/tasks"
 import { getAllProperties } from "@/actions/properties"
+import { getUnits } from "@/actions/units"
 
 type Property = {
   id: string
   name: string
 }
 
+type Unit = {
+  id: string
+  name: string
+  propertyId: string
+}
+
 type Task = {
   id: string
-  propertyId: string
+  unitId: string
   type: string
   title: string
   description: string | null
   scheduledDate: Date
   notes: string | null
   status: string
+  unit: {
+    id: string
+    name: string
+    propertyId: string
+    property: {
+      id: string
+      name: string
+    }
+  }
 }
 
 const TASK_TYPES = [
@@ -48,7 +64,9 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
   const [task, setTask] = useState<Task | null>(null)
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
 
   useEffect(() => {
     async function loadData() {
@@ -58,12 +76,25 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
       ])
 
       if (taskData) {
-        setTask(taskData)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setTask(taskData as any)
+        setSelectedPropertyId(taskData.unit.propertyId)
+        // Load units for the property
+        const unitsResult = await getUnits({ propertyId: taskData.unit.propertyId })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setUnits(unitsResult.items as any[])
       }
       setProperties(propertiesData)
     }
     loadData()
   }, [params.id])
+
+  async function handlePropertyChange(propertyId: string) {
+    setSelectedPropertyId(propertyId)
+    const unitsResult = await getUnits({ propertyId })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setUnits(unitsResult.items as any[])
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -79,7 +110,7 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
       } else if (result.error) {
         setError(result.error)
       }
-    } catch (err) {
+    } catch {
       setError("Erro ao atualizar tarefa. Verifique os dados e tente novamente.")
     } finally {
       setIsLoading(false)
@@ -159,7 +190,11 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
 
               <div className="space-y-2">
                 <Label htmlFor="propertyId">Imovel *</Label>
-                <Select name="propertyId" defaultValue={task.propertyId} disabled={isLoading}>
+                <Select
+                  value={selectedPropertyId}
+                  onValueChange={handlePropertyChange}
+                  disabled={isLoading}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o imovel" />
                   </SelectTrigger>
@@ -167,6 +202,27 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
                     {properties.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unitId">Unidade *</Label>
+                <Select
+                  name="unitId"
+                  required
+                  disabled={isLoading || !selectedPropertyId}
+                  defaultValue={task.unitId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedPropertyId ? "Selecione a unidade" : "Selecione um imovel primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -206,12 +262,12 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
             <CardHeader>
               <CardTitle>Agendamento</CardTitle>
               <CardDescription>
-                Quando a tarefa deve ser realizada
+                Data e observacoes
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="scheduledDate">Data *</Label>
+                <Label htmlFor="scheduledDate">Data Agendada *</Label>
                 <Input
                   id="scheduledDate"
                   name="scheduledDate"
@@ -228,7 +284,7 @@ export default function EditTaskPage({ params }: { params: { id: string } }) {
                   id="notes"
                   name="notes"
                   defaultValue={task.notes || ""}
-                  rows={3}
+                  rows={5}
                   disabled={isLoading}
                 />
               </div>

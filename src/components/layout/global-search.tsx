@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
-import { Search, Building2, Users, ClipboardList, CheckSquare, Loader2 } from "lucide-react"
+import { Search, Building2, Users, ClipboardList, CheckSquare, Loader2, Home } from "lucide-react"
 import { globalSearch, type SearchResult } from "@/actions/search"
 import { useDebounce } from "@/hooks/use-debounce"
 
 const typeIcons = {
   property: Building2,
+  unit: Home,
   reservation: ClipboardList,
   owner: Users,
   task: CheckSquare,
@@ -16,6 +17,7 @@ const typeIcons = {
 
 const typeLabels = {
   property: "Imovel",
+  unit: "Unidade",
   reservation: "Reserva",
   owner: "Proprietario",
   task: "Tarefa",

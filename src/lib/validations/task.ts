@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const taskSchema = z.object({
-  propertyId: z.string().min(1, "Imovel e obrigatorio"),
+  unitId: z.string().min(1, "Unidade e obrigatoria"),
   reservationId: z.string().optional(),
   type: z.enum(["CLEANING", "MAINTENANCE", "INSPECTION", "OTHER"]),
   title: z.string().min(1, "Titulo e obrigatorio"),

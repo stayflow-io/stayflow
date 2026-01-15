@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 
 export type SearchResult = {
-  type: "property" | "reservation" | "owner" | "task"
+  type: "property" | "unit" | "reservation" | "owner" | "task"
   id: string
   title: string
   subtitle: string
@@ -22,7 +22,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
   const tenantId = session.user.tenantId
 
   // Executar todas as buscas em paralelo para melhor performance
-  const [properties, reservations, owners, tasks] = await Promise.all([
+  const [properties, units, reservations, owners, tasks] = await Promise.all([
     // Buscar imóveis
     prisma.property.findMany({
       where: {
@@ -34,12 +34,29 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
           { city: { contains: query, mode: "insensitive" } },
         ],
       },
-      take: 4,
+      take: 3,
       select: {
         id: true,
         name: true,
         city: true,
         state: true,
+      },
+    }),
+    // Buscar unidades
+    prisma.unit.findMany({
+      where: {
+        property: { tenantId },
+        deletedAt: null,
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { description: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      take: 3,
+      select: {
+        id: true,
+        name: true,
+        property: { select: { id: true, name: true } },
       },
     }),
     // Buscar reservas (por nome do hóspede ou email)
@@ -52,11 +69,16 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
           { guestPhone: { contains: query, mode: "insensitive" } },
         ],
       },
-      take: 4,
+      take: 3,
       select: {
         id: true,
         guestName: true,
-        property: { select: { name: true } },
+        unit: {
+          select: {
+            name: true,
+            property: { select: { name: true } },
+          },
+        },
       },
     }),
     // Buscar proprietários
@@ -70,7 +92,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
           { phone: { contains: query, mode: "insensitive" } },
         ],
       },
-      take: 4,
+      take: 3,
       select: {
         id: true,
         name: true,
@@ -86,11 +108,16 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
           { description: { contains: query, mode: "insensitive" } },
         ],
       },
-      take: 4,
+      take: 3,
       select: {
         id: true,
         title: true,
-        property: { select: { name: true } },
+        unit: {
+          select: {
+            name: true,
+            property: { select: { name: true } },
+          },
+        },
       },
     }),
   ])
@@ -108,12 +135,22 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     })
   })
 
+  units.forEach((u) => {
+    results.push({
+      type: "unit",
+      id: u.id,
+      title: u.name,
+      subtitle: u.property.name,
+      href: `/properties/${u.property.id}/units/${u.id}`,
+    })
+  })
+
   reservations.forEach((r) => {
     results.push({
       type: "reservation",
       id: r.id,
       title: r.guestName,
-      subtitle: r.property.name,
+      subtitle: `${r.unit.property.name} - ${r.unit.name}`,
       href: `/reservations/${r.id}`,
     })
   })
@@ -133,7 +170,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       type: "task",
       id: t.id,
       title: t.title,
-      subtitle: t.property.name,
+      subtitle: t.unit ? `${t.unit.property.name} - ${t.unit.name}` : "Sem unidade",
       href: `/tasks/${t.id}`,
     })
   })

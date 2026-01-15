@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const reservationSchema = z.object({
-  propertyId: z.string().min(1, "Imovel e obrigatorio"),
+  unitId: z.string().min(1, "Unidade e obrigatoria"),
   guestName: z.string().min(1, "Nome do hospede e obrigatorio"),
   guestEmail: z.string().email("Email invalido").optional().or(z.literal("")),
   guestPhone: z.string().optional(),

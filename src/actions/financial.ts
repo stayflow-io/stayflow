@@ -6,7 +6,9 @@ import { auth } from "@/lib/auth"
 import { cache, cacheKeys, TTL } from "@/lib/redis"
 
 export async function getTransactions(filters?: {
+  unitId?: string
   propertyId?: string
+  ownerId?: string
   type?: string
   startDate?: Date
   endDate?: Date
@@ -14,19 +16,37 @@ export async function getTransactions(filters?: {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const where: any = {
+    tenantId: session.user.tenantId,
+    unit: { deletedAt: null },
+    ...(filters?.unitId && { unitId: filters.unitId }),
+    ...(filters?.propertyId && { unit: { propertyId: filters.propertyId } }),
+    ...(filters?.type && { type: filters.type as any }),
+    ...(filters?.startDate && filters?.endDate && {
+      date: { gte: filters.startDate, lte: filters.endDate },
+    }),
+    ...(filters?.startDate && !filters?.endDate && { date: { gte: filters.startDate } }),
+    ...(!filters?.startDate && filters?.endDate && { date: { lte: filters.endDate } }),
+  }
+
+  // Filter by owner - check both unit.ownerId and unit.property.ownerId
+  if (filters?.ownerId) {
+    where.OR = [
+      { unit: { ownerId: filters.ownerId } },
+      { unit: { ownerId: null, property: { ownerId: filters.ownerId } } },
+    ]
+  }
+
   return prisma.transaction.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      ...(filters?.propertyId && { propertyId: filters.propertyId }),
-      ...(filters?.type && { type: filters.type as any }),
-      ...(filters?.startDate && filters?.endDate && {
-        date: { gte: filters.startDate, lte: filters.endDate },
-      }),
-      ...(filters?.startDate && !filters?.endDate && { date: { gte: filters.startDate } }),
-      ...(!filters?.startDate && filters?.endDate && { date: { lte: filters.endDate } }),
-    },
+    where,
     include: {
-      property: { select: { id: true, name: true } },
+      unit: {
+        include: {
+          property: { select: { id: true, name: true, ownerId: true } },
+          owner: { select: { id: true, name: true } },
+        },
+      },
       reservation: { select: { id: true, guestName: true } },
     },
     orderBy: { date: "desc" },
@@ -39,7 +59,7 @@ export async function createTransaction(formData: FormData) {
   if (!session?.user) throw new Error("Unauthorized")
 
   const data = {
-    propertyId: formData.get("propertyId") as string,
+    unitId: formData.get("unitId") as string,
     reservationId: (formData.get("reservationId") as string) || null,
     type: formData.get("type") as "INCOME" | "EXPENSE",
     category: formData.get("category") as string,
@@ -48,8 +68,21 @@ export async function createTransaction(formData: FormData) {
     description: (formData.get("description") as string) || null,
   }
 
-  if (!data.propertyId || !data.type || !data.category || !data.amount) {
+  if (!data.unitId || !data.type || !data.category || !data.amount) {
     return { error: "Campos obrigatorios nao preenchidos" }
+  }
+
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: data.unitId,
+      property: { tenantId: session.user.tenantId },
+      deletedAt: null,
+    },
+  })
+
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   const transaction = await prisma.transaction.create({
@@ -125,7 +158,7 @@ export async function getFinancialSummary(startDate: Date, endDate: Date): Promi
         transactionCount: countResult,
       }
     },
-    TTL.MEDIUM // 5 minutos
+    TTL.MEDIUM
   )
 }
 

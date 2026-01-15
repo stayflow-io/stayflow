@@ -73,6 +73,7 @@ model Owner {
   tenant     Tenant        @relation(fields: [tenantId], references: [id])
   user       User?         @relation(fields: [userId], references: [id])
   properties Property[]
+  units      Unit[]
   payouts    OwnerPayout[]
 
   @@index([tenantId])
@@ -81,34 +82,25 @@ model Owner {
 }
 
 model Property {
-  id              String         @id @default(cuid())
-  tenantId        String
-  ownerId         String
-  name            String
-  address         String
-  city            String
-  state           String
-  zipcode         String?
-  bedrooms        Int
-  bathrooms       Int
-  maxGuests       Int
-  description     String?
-  amenities       String[]
-  cleaningFee     Decimal        @default(0)
-  adminFeePercent Decimal        @default(20)
-  status          PropertyStatus @default(ACTIVE)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  deletedAt       DateTime?
+  id          String         @id @default(cuid())
+  tenantId    String
+  ownerId     String?        // Opcional - owner padrão das units (se null, cada unit tem seu owner)
+  name        String         // Ex: "Edifício Mar Azul", "Casa da Praia"
+  address     String
+  city        String
+  state       String
+  zipcode     String?
+  description String?
+  amenities   String[]       // Amenidades do prédio/complexo
+  status      PropertyStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
 
   tenant         Tenant            @relation(fields: [tenantId], references: [id])
-  owner          Owner             @relation(fields: [ownerId], references: [id])
-  photos         PropertyPhoto[]
+  owner          Owner?            @relation(fields: [ownerId], references: [id])
+  units          Unit[]
   channels       PropertyChannel[]
-  reservations   Reservation[]
-  calendarBlocks CalendarBlock[]
-  tasks          Task[]
-  transactions   Transaction[]
 
   @@index([tenantId, status])
   @@index([ownerId])
@@ -120,14 +112,50 @@ enum PropertyStatus {
   MAINTENANCE
 }
 
-model PropertyPhoto {
-  id         String   @id @default(cuid())
-  propertyId String
-  url        String
-  order      Int      @default(0)
-  createdAt  DateTime @default(now())
+model Unit {
+  id              String     @id @default(cuid())
+  propertyId      String
+  ownerId         String?    // Se null, herda do Property
+  name            String     // Ex: "Apto 101", "Suíte Master", ou nome único se property tem só 1 unit
+  bedrooms        Int
+  bathrooms       Int
+  maxGuests       Int
+  description     String?
+  amenities       String[]   // Amenidades específicas da unidade
+  cleaningFee     Decimal    @default(0)
+  adminFeePercent Decimal    @default(20)
+  status          UnitStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  deletedAt       DateTime?
 
-  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  property       Property          @relation(fields: [propertyId], references: [id])
+  owner          Owner?            @relation(fields: [ownerId], references: [id])
+  photos         UnitPhoto[]
+  reservations   Reservation[]
+  calendarBlocks CalendarBlock[]
+  tasks          Task[]
+  transactions   Transaction[]
+
+  @@index([propertyId])
+  @@index([ownerId])
+  @@index([propertyId, status])
+}
+
+enum UnitStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model UnitPhoto {
+  id        String   @id @default(cuid())
+  unitId    String
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  unit Unit @relation(fields: [unitId], references: [id], onDelete: Cascade)
 }
 
 // ==================== CHANNEL MANAGER ====================
@@ -160,16 +188,16 @@ model PropertyChannel {
 }
 
 model CalendarBlock {
-  id         String   @id @default(cuid())
-  propertyId String
-  startDate  DateTime
-  endDate    DateTime
-  reason     String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  unitId    String
+  startDate DateTime
+  endDate   DateTime
+  reason    String?
+  createdAt DateTime @default(now())
 
-  property Property @relation(fields: [propertyId], references: [id])
+  unit Unit @relation(fields: [unitId], references: [id])
 
-  @@index([propertyId, startDate, endDate])
+  @@index([unitId, startDate, endDate])
 }
 
 // ==================== GUESTS ====================
@@ -198,7 +226,7 @@ model Guest {
 model Reservation {
   id                    String            @id @default(cuid())
   tenantId              String
-  propertyId            String
+  unitId                String
   channelId             String?
   guestId               String?
   externalReservationId String?
@@ -218,7 +246,7 @@ model Reservation {
   updatedAt             DateTime          @updatedAt
 
   tenant       Tenant             @relation(fields: [tenantId], references: [id])
-  property     Property           @relation(fields: [propertyId], references: [id])
+  unit         Unit               @relation(fields: [unitId], references: [id])
   channel      Channel?           @relation(fields: [channelId], references: [id])
   guest        Guest?             @relation(fields: [guestId], references: [id])
   events       ReservationEvent[]
@@ -228,7 +256,7 @@ model Reservation {
 
   @@index([tenantId, checkinDate])
   @@index([tenantId, status])
-  @@index([propertyId, checkinDate])
+  @@index([unitId, checkinDate])
   @@index([guestId])
 }
 
@@ -257,7 +285,7 @@ model ReservationEvent {
 model Task {
   id                  String     @id @default(cuid())
   tenantId            String
-  propertyId          String
+  unitId              String
   reservationId       String?
   recurringTemplateId String?
   type                TaskType
@@ -272,7 +300,7 @@ model Task {
   updatedAt           DateTime   @updatedAt
 
   tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  property          Property           @relation(fields: [propertyId], references: [id])
+  unit              Unit               @relation(fields: [unitId], references: [id])
   reservation       Reservation?       @relation(fields: [reservationId], references: [id])
   assignedTo        User?              @relation(fields: [assignedToId], references: [id])
   recurringTemplate RecurringTask?     @relation(fields: [recurringTemplateId], references: [id])
@@ -280,6 +308,7 @@ model Task {
 
   @@index([tenantId, scheduledDate])
   @@index([tenantId, status])
+  @@index([unitId])
 }
 
 model RecurringTask {
@@ -396,7 +425,7 @@ enum MessageStatus {
 model Transaction {
   id            String          @id @default(cuid())
   tenantId      String
-  propertyId    String
+  unitId        String
   reservationId String?
   type          TransactionType
   category      String
@@ -409,12 +438,12 @@ model Transaction {
   updatedAt     DateTime        @updatedAt
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  property    Property     @relation(fields: [propertyId], references: [id])
+  unit        Unit         @relation(fields: [unitId], references: [id])
   reservation Reservation? @relation(fields: [reservationId], references: [id])
   createdBy   User?        @relation(fields: [createdById], references: [id])
 
   @@index([tenantId, date])
-  @@index([propertyId, date])
+  @@index([unitId, date])
   @@index([tenantId, type])
 }
 

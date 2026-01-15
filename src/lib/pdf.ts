@@ -9,19 +9,24 @@ interface FinancialReportData {
   periodEnd: Date
   properties: {
     name: string
-    reservations: {
-      guestName: string
-      checkinDate: Date
-      checkoutDate: Date
-      totalAmount: number
-      channelFee: number
-      cleaningFee: number
-      netAmount: number
-    }[]
-    expenses: {
-      description: string
-      date: Date
-      amount: number
+    units: {
+      name: string
+      reservations: {
+        guestName: string
+        checkinDate: Date
+        checkoutDate: Date
+        totalAmount: number
+        channelFee: number
+        cleaningFee: number
+        netAmount: number
+      }[]
+      expenses: {
+        description: string
+        date: Date
+        amount: number
+      }[]
+      totalRevenue: number
+      totalExpenses: number
     }[]
     totalRevenue: number
     totalExpenses: number
@@ -57,7 +62,7 @@ export function generateOwnerReport(data: FinancialReportData): jsPDF {
 
   let yPosition = 62
 
-  // Properties
+  // Properties and their units
   for (const property of data.properties) {
     // Check if we need a new page
     if (yPosition > 250) {
@@ -70,69 +75,88 @@ export function generateOwnerReport(data: FinancialReportData): jsPDF {
     doc.text(property.name, 14, yPosition)
     yPosition += 8
 
-    // Reservations table
-    if (property.reservations.length > 0) {
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "normal")
-      doc.text("Reservas:", 14, yPosition)
-      yPosition += 4
-
-      autoTable(doc, {
-        startY: yPosition,
-        head: [["Hospede", "Check-in", "Check-out", "Total", "Taxas", "Liquido"]],
-        body: property.reservations.map((r) => [
-          r.guestName,
-          format(r.checkinDate, "dd/MM"),
-          format(r.checkoutDate, "dd/MM"),
-          formatCurrency(r.totalAmount),
-          formatCurrency(r.channelFee + r.cleaningFee),
-          formatCurrency(r.netAmount),
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [51, 51, 51] },
-        styles: { fontSize: 8 },
-        margin: { left: 14, right: 14 },
-      })
-
-      yPosition = (doc as any).lastAutoTable.finalY + 8
-    }
-
-    // Expenses table
-    if (property.expenses.length > 0) {
+    // Units
+    for (const unit of property.units) {
       if (yPosition > 250) {
         doc.addPage()
         yPosition = 20
       }
 
-      doc.setFontSize(10)
-      doc.text("Despesas:", 14, yPosition)
-      yPosition += 4
+      doc.setFontSize(11)
+      doc.setFont("helvetica", "bold")
+      doc.text(`  ${unit.name}`, 14, yPosition)
+      yPosition += 6
 
-      autoTable(doc, {
-        startY: yPosition,
-        head: [["Descricao", "Data", "Valor"]],
-        body: property.expenses.map((e) => [
-          e.description,
-          format(e.date, "dd/MM/yyyy"),
-          formatCurrency(e.amount),
-        ]),
-        theme: "striped",
-        headStyles: { fillColor: [51, 51, 51] },
-        styles: { fontSize: 8 },
-        margin: { left: 14, right: 14 },
-      })
+      // Reservations table
+      if (unit.reservations.length > 0) {
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        doc.text("  Reservas:", 14, yPosition)
+        yPosition += 4
 
-      yPosition = (doc as any).lastAutoTable.finalY + 8
+        autoTable(doc, {
+          startY: yPosition,
+          head: [["Hospede", "Check-in", "Check-out", "Total", "Taxas", "Liquido"]],
+          body: unit.reservations.map((r) => [
+            r.guestName,
+            format(r.checkinDate, "dd/MM"),
+            format(r.checkoutDate, "dd/MM"),
+            formatCurrency(r.totalAmount),
+            formatCurrency(r.channelFee + r.cleaningFee),
+            formatCurrency(r.netAmount),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [51, 51, 51] },
+          styles: { fontSize: 8 },
+          margin: { left: 20, right: 14 },
+        })
+
+        yPosition = (doc as any).lastAutoTable.finalY + 6
+      }
+
+      // Expenses table
+      if (unit.expenses.length > 0) {
+        if (yPosition > 250) {
+          doc.addPage()
+          yPosition = 20
+        }
+
+        doc.setFontSize(10)
+        doc.text("  Despesas:", 14, yPosition)
+        yPosition += 4
+
+        autoTable(doc, {
+          startY: yPosition,
+          head: [["Descricao", "Data", "Valor"]],
+          body: unit.expenses.map((e) => [
+            e.description,
+            format(e.date, "dd/MM/yyyy"),
+            formatCurrency(e.amount),
+          ]),
+          theme: "striped",
+          headStyles: { fillColor: [51, 51, 51] },
+          styles: { fontSize: 8 },
+          margin: { left: 20, right: 14 },
+        })
+
+        yPosition = (doc as any).lastAutoTable.finalY + 6
+      }
+
+      // Unit subtotals
+      doc.setFontSize(8)
+      doc.text(`  Receita: ${formatCurrency(unit.totalRevenue)}`, 20, yPosition)
+      doc.text(
+        `Despesas: ${formatCurrency(unit.totalExpenses)}`,
+        90,
+        yPosition
+      )
+      yPosition += 8
     }
 
     // Property subtotals
     doc.setFontSize(9)
-    doc.text(`Receita: ${formatCurrency(property.totalRevenue)}`, 14, yPosition)
-    doc.text(
-      `Despesas: ${formatCurrency(property.totalExpenses)}`,
-      80,
-      yPosition
-    )
+    doc.setFont("helvetica", "bold")
+    doc.text(`Subtotal ${property.name}: Receita: ${formatCurrency(property.totalRevenue)} | Despesas: ${formatCurrency(property.totalExpenses)}`, 14, yPosition)
     yPosition += 12
   }
 

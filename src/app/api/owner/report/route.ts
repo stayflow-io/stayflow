@@ -15,8 +15,11 @@ export async function POST(request: Request) {
   const owner = await prisma.owner.findFirst({
     where: { userId: session.user.id },
     include: {
-      properties: {
+      // Direct units
+      units: {
+        where: { deletedAt: null },
         include: {
+          property: true,
           reservations: {
             where: {
               checkoutDate: {
@@ -45,6 +48,46 @@ export async function POST(request: Request) {
           },
         },
       },
+      // Properties owned (units inherit ownership)
+      properties: {
+        where: { deletedAt: null },
+        include: {
+          units: {
+            where: {
+              deletedAt: null,
+              ownerId: null, // Only units that inherit from property
+            },
+            include: {
+              reservations: {
+                where: {
+                  checkoutDate: {
+                    gte: start,
+                    lte: end,
+                  },
+                  status: {
+                    in: ["CHECKED_OUT", "CONFIRMED"],
+                  },
+                },
+                orderBy: {
+                  checkinDate: "asc",
+                },
+              },
+              transactions: {
+                where: {
+                  type: "EXPENSE",
+                  date: {
+                    gte: start,
+                    lte: end,
+                  },
+                },
+                orderBy: {
+                  date: "asc",
+                },
+              },
+            },
+          },
+        },
+      },
     },
   })
 
@@ -55,22 +98,37 @@ export async function POST(request: Request) {
   let grossAmount = 0
   let totalExpenses = 0
 
-  const properties = owner.properties.map((property) => {
-    const propertyRevenue = property.reservations.reduce(
+  // Combine direct units and inherited units
+  const directUnits = owner.units.map((u) => ({
+    ...u,
+    propertyName: u.property.name,
+  }))
+
+  const inheritedUnits = owner.properties.flatMap((p) =>
+    p.units.map((u) => ({
+      ...u,
+      propertyName: p.name,
+    }))
+  )
+
+  const allUnits = [...directUnits, ...inheritedUnits]
+
+  const units = allUnits.map((unit) => {
+    const unitRevenue = unit.reservations.reduce(
       (sum, r) => sum + Number(r.netAmount),
       0
     )
-    const propertyExpenses = property.transactions.reduce(
+    const unitExpenses = unit.transactions.reduce(
       (sum, t) => sum + Number(t.amount),
       0
     )
 
-    grossAmount += propertyRevenue
-    totalExpenses += propertyExpenses
+    grossAmount += unitRevenue
+    totalExpenses += unitExpenses
 
     return {
-      name: property.name,
-      reservations: property.reservations.map((r) => ({
+      name: `${unit.propertyName} - ${unit.name}`,
+      reservations: unit.reservations.map((r) => ({
         guestName: r.guestName,
         checkinDate: r.checkinDate,
         checkoutDate: r.checkoutDate,
@@ -79,13 +137,13 @@ export async function POST(request: Request) {
         cleaningFee: Number(r.cleaningFee),
         netAmount: Number(r.netAmount),
       })),
-      expenses: property.transactions.map((t) => ({
+      expenses: unit.transactions.map((t) => ({
         description: t.description || t.category,
         date: t.date,
         amount: Number(t.amount),
       })),
-      totalRevenue: propertyRevenue,
-      totalExpenses: propertyExpenses,
+      totalRevenue: unitRevenue,
+      totalExpenses: unitExpenses,
     }
   })
 
@@ -97,7 +155,7 @@ export async function POST(request: Request) {
     ownerName: owner.name,
     periodStart: start,
     periodEnd: end,
-    properties,
+    units,
     grossAmount,
     totalExpenses,
     adminFee,

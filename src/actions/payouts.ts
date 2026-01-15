@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { cache, cacheKeys } from "@/lib/redis"
+import { getEffectiveOwnerId } from "@/lib/utils/ownership"
 
 export async function getPayouts(filters?: { ownerId?: string; status?: string }) {
   const session = await auth()
@@ -41,14 +42,25 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  // Buscar proprietário e imóveis em paralelo para otimizar
-  const [owner, properties] = await Promise.all([
+  // Buscar proprietário e unidades que pertencem a ele (diretamente ou via property)
+  const [owner, directUnits, propertiesWithUnits] = await Promise.all([
     prisma.owner.findFirst({
       where: { id: ownerId, tenantId: session.user.tenantId },
     }),
-    prisma.property.findMany({
+    // Units directly owned by this owner
+    prisma.unit.findMany({
       where: { ownerId, deletedAt: null },
       select: { id: true, adminFeePercent: true },
+    }),
+    // Properties owned by this owner (units without their own owner inherit from property)
+    prisma.property.findMany({
+      where: { ownerId, tenantId: session.user.tenantId, deletedAt: null },
+      include: {
+        units: {
+          where: { ownerId: null, deletedAt: null },
+          select: { id: true, adminFeePercent: true },
+        },
+      },
     }),
   ])
 
@@ -56,10 +68,13 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
     return { error: "Proprietario nao encontrado" }
   }
 
-  const propertyIds = properties.map((p) => p.id)
+  // Combine all units that belong to this owner
+  const inheritedUnits = propertiesWithUnits.flatMap((p) => p.units)
+  const allUnits = [...directUnits, ...inheritedUnits]
+  const unitIds = allUnits.map((u) => u.id)
 
-  // Se não houver imóveis, retornar zerado
-  if (propertyIds.length === 0) {
+  // Se não houver unidades, retornar zerado
+  if (unitIds.length === 0) {
     return {
       success: true,
       preview: {
@@ -78,7 +93,7 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
   const [reservations, expenses] = await Promise.all([
     prisma.reservation.findMany({
       where: {
-        propertyId: { in: propertyIds },
+        unitId: { in: unitIds },
         status: "CHECKED_OUT",
         checkoutDate: {
           gte: periodStart,
@@ -91,7 +106,7 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
     }),
     prisma.transaction.findMany({
       where: {
-        propertyId: { in: propertyIds },
+        unitId: { in: unitIds },
         type: "EXPENSE",
         date: {
           gte: periodStart,
@@ -107,8 +122,8 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
   // Calcular valores
   const grossAmount = reservations.reduce((sum, r) => sum + Number(r.netAmount), 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-  const avgAdminFee = properties.length > 0
-    ? properties.reduce((sum, p) => sum + Number(p.adminFeePercent), 0) / properties.length
+  const avgAdminFee = allUnits.length > 0
+    ? allUnits.reduce((sum, u) => sum + Number(u.adminFeePercent), 0) / allUnits.length
     : 20
   const adminFee = (grossAmount * avgAdminFee) / 100
   const netAmount = grossAmount - totalExpenses - adminFee

@@ -10,6 +10,7 @@ const ITEMS_PER_PAGE = 20
 
 export async function getTasks(filters?: {
   status?: string
+  unitId?: string
   propertyId?: string
   ownerId?: string
   type?: string
@@ -31,20 +32,35 @@ export async function getTasks(filters?: {
       }
     : {}
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const where: any = {
     tenantId: session.user.tenantId,
+    unit: { deletedAt: null },
     ...(filters?.status && { status: filters.status as any }),
-    ...(filters?.propertyId && { propertyId: filters.propertyId }),
-    ...(filters?.ownerId && { property: { ownerId: filters.ownerId } }),
+    ...(filters?.unitId && { unitId: filters.unitId }),
+    ...(filters?.propertyId && { unit: { propertyId: filters.propertyId } }),
     ...(filters?.type && { type: filters.type as any }),
     ...dateFilter,
+  }
+
+  // Filter by owner - check both unit.ownerId and unit.property.ownerId
+  if (filters?.ownerId) {
+    where.OR = [
+      { unit: { ownerId: filters.ownerId } },
+      { unit: { ownerId: null, property: { ownerId: filters.ownerId } } },
+    ]
   }
 
   const [items, total] = await Promise.all([
     prisma.task.findMany({
       where,
       include: {
-        property: true,
+        unit: {
+          include: {
+            property: { select: { id: true, name: true, ownerId: true } },
+            owner: { select: { id: true, name: true } },
+          },
+        },
         reservation: true,
         assignedTo: { select: { name: true } },
         checklist: true,
@@ -77,7 +93,12 @@ export async function getTask(id: string) {
       tenantId: session.user.tenantId,
     },
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: { select: { id: true, name: true, ownerId: true, address: true, city: true, state: true } },
+          owner: true,
+        },
+      },
       reservation: true,
       assignedTo: { select: { id: true, name: true } },
       checklist: true,
@@ -90,7 +111,7 @@ export async function createTask(formData: FormData) {
   if (!session?.user) throw new Error("Unauthorized")
 
   const rawData = {
-    propertyId: formData.get("propertyId"),
+    unitId: formData.get("unitId"),
     reservationId: formData.get("reservationId") || undefined,
     type: formData.get("type"),
     title: formData.get("title"),
@@ -104,6 +125,19 @@ export async function createTask(formData: FormData) {
 
   if (!validated.success) {
     return { error: validated.error.errors[0].message }
+  }
+
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: validated.data.unitId,
+      property: { tenantId: session.user.tenantId },
+      deletedAt: null,
+    },
+  })
+
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   const task = await prisma.task.create({

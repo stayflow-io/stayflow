@@ -12,13 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft } from "lucide-react"
 import { createReservation } from "@/actions/reservations"
 import { getAllProperties } from "@/actions/properties"
+import { getUnits } from "@/actions/units"
 import { useToast } from "@/hooks/use-toast"
 
 type Property = {
   id: string
   name: string
+}
+
+type Unit = {
+  id: string
+  name: string
+  propertyId: string
   maxGuests: number
-  cleaningFee: any
+  cleaningFee: unknown // Decimal from Prisma
 }
 
 export default function NewReservationPage() {
@@ -27,11 +34,26 @@ export default function NewReservationPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [properties, setProperties] = useState<Property[]>([])
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null)
+  const [units, setUnits] = useState<Unit[]>([])
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
+  const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null)
 
   useEffect(() => {
     getAllProperties().then((data) => setProperties(data))
   }, [])
+
+  async function handlePropertyChange(propertyId: string) {
+    setSelectedPropertyId(propertyId)
+    setSelectedUnit(null)
+    const unitsResult = await getUnits({ propertyId })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    setUnits(unitsResult.items as any[])
+  }
+
+  function handleUnitChange(unitId: string) {
+    const unit = units.find((u) => u.id === unitId)
+    setSelectedUnit(unit || null)
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -56,7 +78,7 @@ export default function NewReservationPage() {
           variant: "destructive",
         })
       }
-    } catch (err) {
+    } catch {
       setError("Erro ao criar reserva. Verifique os dados e tente novamente.")
       toast({
         title: "Erro",
@@ -66,11 +88,6 @@ export default function NewReservationPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  function handlePropertyChange(propertyId: string) {
-    const property = properties.find((p) => p.id === propertyId)
-    setSelectedProperty(property || null)
   }
 
   return (
@@ -95,7 +112,7 @@ export default function NewReservationPage() {
             <CardHeader>
               <CardTitle>Imovel e Hospede</CardTitle>
               <CardDescription>
-                Selecione o imovel e informe os dados do hospede
+                Selecione o imovel, unidade e informe os dados do hospede
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -108,10 +125,9 @@ export default function NewReservationPage() {
               <div className="space-y-2">
                 <Label htmlFor="propertyId">Imovel *</Label>
                 <Select
-                  name="propertyId"
-                  required
-                  disabled={isLoading}
+                  value={selectedPropertyId}
                   onValueChange={handlePropertyChange}
+                  disabled={isLoading}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione o imovel" />
@@ -120,6 +136,27 @@ export default function NewReservationPage() {
                     {properties.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
                         {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="unitId">Unidade *</Label>
+                <Select
+                  name="unitId"
+                  required
+                  disabled={isLoading || !selectedPropertyId}
+                  onValueChange={handleUnitChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedPropertyId ? "Selecione a unidade" : "Selecione um imovel primeiro"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((unit) => (
+                      <SelectItem key={unit.id} value={unit.id}>
+                        {unit.name} (max {unit.maxGuests} hospedes)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -167,14 +204,14 @@ export default function NewReservationPage() {
                   name="numGuests"
                   type="number"
                   min="1"
-                  max={selectedProperty?.maxGuests || 10}
+                  max={selectedUnit?.maxGuests || 10}
                   defaultValue="1"
                   required
                   disabled={isLoading}
                 />
-                {selectedProperty && (
+                {selectedUnit && (
                   <p className="text-xs text-muted-foreground">
-                    Maximo: {selectedProperty.maxGuests} hospedes
+                    Maximo: {selectedUnit.maxGuests} hospedes
                   </p>
                 )}
               </div>
@@ -236,7 +273,8 @@ export default function NewReservationPage() {
                     type="number"
                     min="0"
                     step="0.01"
-                    defaultValue={selectedProperty ? Number(selectedProperty.cleaningFee) : 0}
+                    defaultValue={selectedUnit ? Number(selectedUnit.cleaningFee) : 0}
+                    key={selectedUnit?.id || "no-unit"} // Force re-render when unit changes
                     disabled={isLoading}
                   />
                 </div>
@@ -273,7 +311,7 @@ export default function NewReservationPage() {
           <Button type="button" variant="outline" asChild disabled={isLoading}>
             <Link href="/reservations">Cancelar</Link>
           </Button>
-          <Button type="submit" disabled={isLoading}>
+          <Button type="submit" disabled={isLoading || !selectedUnit}>
             {isLoading ? "Salvando..." : "Criar Reserva"}
           </Button>
         </div>

@@ -43,14 +43,13 @@ const cities = [
   { city: "Paraty", state: "RJ", neighborhoods: ["Centro Historico", "Jabaquara", "Cabore", "Pontal"] },
 ]
 
-const propertyTypes = [
+const unitTypes = [
   { prefix: "Apartamento", bedrooms: [1, 2, 3], bathrooms: [1, 2], maxGuests: [2, 4, 6] },
   { prefix: "Studio", bedrooms: [1], bathrooms: [1], maxGuests: [2, 3] },
-  { prefix: "Casa", bedrooms: [3, 4, 5], bathrooms: [2, 3, 4], maxGuests: [6, 8, 10, 12] },
   { prefix: "Flat", bedrooms: [1, 2], bathrooms: [1, 2], maxGuests: [2, 4] },
   { prefix: "Cobertura", bedrooms: [3, 4], bathrooms: [2, 3], maxGuests: [6, 8] },
   { prefix: "Loft", bedrooms: [1], bathrooms: [1], maxGuests: [2, 4] },
-  { prefix: "Chale", bedrooms: [2, 3], bathrooms: [1, 2], maxGuests: [4, 6] },
+  { prefix: "Suite", bedrooms: [1], bathrooms: [1], maxGuests: [2] },
 ]
 
 const amenitiesList = [
@@ -81,13 +80,14 @@ async function main() {
   await prisma.messageTemplate.deleteMany()
   await prisma.reservationEvent.deleteMany()
   await prisma.reservation.deleteMany()
-  await prisma.propertyPhoto.deleteMany()
+  await prisma.unitPhoto.deleteMany()
   await prisma.propertyChannel.deleteMany()
   await prisma.calendarBlock.deleteMany()
   await prisma.taskChecklist.deleteMany()
   await prisma.task.deleteMany()
   await prisma.transaction.deleteMany()
   await prisma.ownerPayout.deleteMany()
+  await prisma.unit.deleteMany()
   await prisma.property.deleteMany()
   await prisma.owner.deleteMany()
   await prisma.user.deleteMany()
@@ -233,58 +233,127 @@ async function main() {
     owners.push(owner)
   }
 
-  console.log("🏡 Criando imoveis...")
+  console.log("🏡 Criando propriedades e unidades...")
 
-  const properties: Array<{ id: string; name: string; status: string; cleaningFee: any; maxGuests: number }> = []
-  for (let i = 0; i < 20; i++) {
+  const units: Array<{ id: string; name: string; status: string; cleaningFee: any; maxGuests: number; propertyId: string }> = []
+
+  // Criar propriedades (prédios/complexos) com múltiplas unidades
+  for (let i = 0; i < 8; i++) {
     const cityData = randomItem(cities)
     const neighborhood = randomItem(cityData.neighborhoods)
-    const propType = randomItem(propertyTypes)
-    const bedrooms = randomItem(propType.bedrooms)
-    const bathrooms = randomItem(propType.bathrooms)
-    const maxGuests = randomItem(propType.maxGuests)
     const owner = randomItem(owners)
 
-    const suffixes = ["Vista Mar", "Completo", "Luxo", "Aconchegante", "Moderno", "Premium", "Reformado", "Central", "Exclusivo", "Charmoso"]
-    const name = `${propType.prefix} ${neighborhood} ${randomItem(suffixes)}`
-
-    const numAmenities = randomInt(5, 12)
-    const amenities = [...amenitiesList].sort(() => Math.random() - 0.5).slice(0, numAmenities)
+    const propertyNames = ["Edificio Mar Azul", "Residencial Sol Nascente", "Condominio Vista Mar", "Torre Premium", "Edificio Central", "Residencial Praia", "Condominio Paradiso", "Torre Executive"]
+    const propertyName = propertyNames[i]
 
     const property = await prisma.property.create({
       data: {
         tenantId: tenant.id,
         ownerId: owner.id,
-        name,
-        address: `Rua ${randomItem(lastNames)}, ${randomInt(1, 2000)}${propType.prefix === "Casa" ? "" : `, Apto ${randomInt(101, 2505)}`}`,
+        name: `${propertyName} - ${neighborhood}`,
+        address: `Rua ${randomItem(lastNames)}, ${randomInt(1, 2000)}`,
         city: cityData.city,
         state: cityData.state,
         zipcode: `${randomInt(10000, 99999)}-${randomInt(100, 999)}`,
+        description: `${propertyName} localizado em ${neighborhood}, ${cityData.city}. Prédio com excelente infraestrutura.`,
+        amenities: ["portaria 24h", "elevador", "estacionamento", "piscina"],
+        status: "ACTIVE",
+      },
+    })
+
+    // Criar múltiplas unidades para cada propriedade
+    const numUnits = randomInt(2, 5)
+    for (let j = 0; j < numUnits; j++) {
+      const unitType = randomItem(unitTypes)
+      const bedrooms = randomItem(unitType.bedrooms)
+      const bathrooms = randomItem(unitType.bathrooms)
+      const maxGuests = randomItem(unitType.maxGuests)
+
+      // Algumas unidades têm dono diferente do prédio
+      const unitOwner = Math.random() > 0.7 ? randomItem(owners) : null
+
+      const numAmenities = randomInt(5, 10)
+      const unitAmenities = [...amenitiesList].sort(() => Math.random() - 0.5).slice(0, numAmenities)
+
+      const unit = await prisma.unit.create({
+        data: {
+          propertyId: property.id,
+          ownerId: unitOwner?.id || null,
+          name: `${unitType.prefix} ${100 * (Math.floor(j / 4) + 1) + (j % 4) + 1}`,
+          bedrooms,
+          bathrooms,
+          maxGuests,
+          description: `${unitType.prefix} com ${bedrooms} quarto${bedrooms > 1 ? "s" : ""} em ${neighborhood}. ${unitAmenities.slice(0, 3).join(", ")}.`,
+          amenities: unitAmenities,
+          cleaningFee: randomItem([100, 120, 150, 180, 200, 250]),
+          adminFeePercent: randomItem([15, 20, 25]),
+          status: Math.random() > 0.1 ? "ACTIVE" : randomItem(["INACTIVE", "MAINTENANCE"]),
+        },
+      })
+      units.push(unit)
+    }
+  }
+
+  // Criar algumas propriedades com apenas uma unidade (casas independentes)
+  for (let i = 0; i < 6; i++) {
+    const cityData = randomItem(cities)
+    const neighborhood = randomItem(cityData.neighborhoods)
+    const owner = randomItem(owners)
+
+    const suffixes = ["Vista Mar", "Aconchegante", "Luxo", "Premium", "Charmosa", "Exclusiva"]
+    const propertyName = `Casa ${randomItem(suffixes)}`
+
+    const property = await prisma.property.create({
+      data: {
+        tenantId: tenant.id,
+        ownerId: owner.id,
+        name: `${propertyName} - ${neighborhood}`,
+        address: `Rua ${randomItem(lastNames)}, ${randomInt(1, 2000)}`,
+        city: cityData.city,
+        state: cityData.state,
+        zipcode: `${randomInt(10000, 99999)}-${randomInt(100, 999)}`,
+        description: `Casa ${suffixes[i]} em ${neighborhood}, ${cityData.city}.`,
+        amenities: ["churrasqueira", "jardim", "estacionamento"],
+        status: "ACTIVE",
+      },
+    })
+
+    // Casa tem apenas 1 unidade
+    const bedrooms = randomInt(3, 5)
+    const bathrooms = randomInt(2, 4)
+    const maxGuests = randomInt(6, 12)
+
+    const numAmenities = randomInt(8, 15)
+    const unitAmenities = [...amenitiesList].sort(() => Math.random() - 0.5).slice(0, numAmenities)
+
+    const unit = await prisma.unit.create({
+      data: {
+        propertyId: property.id,
+        ownerId: null, // Herda do property
+        name: propertyName,
         bedrooms,
         bathrooms,
         maxGuests,
-        description: `${propType.prefix} ${bedrooms > 1 ? `com ${bedrooms} quartos` : ""} em ${neighborhood}, ${cityData.city}. ${amenities.slice(0, 3).join(", ")} e muito mais.`,
-        amenities,
-        cleaningFee: randomItem([100, 120, 150, 180, 200, 250, 300, 350]),
+        description: `Casa com ${bedrooms} quartos e ${bathrooms} banheiros. ${unitAmenities.slice(0, 4).join(", ")}.`,
+        amenities: unitAmenities,
+        cleaningFee: randomItem([200, 250, 300, 350, 400]),
         adminFeePercent: randomItem([15, 20, 25]),
-        status: i < 18 ? "ACTIVE" : randomItem(["INACTIVE", "MAINTENANCE"]),
+        status: "ACTIVE",
       },
     })
-    properties.push(property)
+    units.push(unit)
   }
 
-  const activeProperties = properties.filter((p) => p.status === "ACTIVE")
+  const activeUnits = units.filter((u) => u.status === "ACTIVE")
 
   console.log("📅 Criando reservas...")
 
   const today = new Date()
   today.setHours(14, 0, 0, 0)
 
-  const reservationStatuses = ["PENDING", "CONFIRMED", "CHECKED_IN", "CHECKED_OUT", "CANCELLED"]
-
-  const reservations: Array<{ id: string; propertyId: string; guestName: string; checkinDate: Date; totalAmount: any; status: string }> = []
+  const reservations: Array<{ id: string; unitId: string; guestName: string; checkinDate: Date; totalAmount: any; status: string }> = []
   for (let i = 0; i < 40; i++) {
-    const property = randomItem(activeProperties)
+    const unit = randomItem(activeUnits)
     const channel = Math.random() > 0.2 ? randomItem(channels) : null
     const firstName = randomItem(firstNames)
     const lastName = randomItem(lastNames)
@@ -315,17 +384,17 @@ async function main() {
     const checkinDate = addDays(today, checkinOffset)
     const nights = randomInt(2, 10)
     const checkoutDate = addDays(checkinDate, nights)
-    const numGuests = randomInt(1, property.maxGuests)
+    const numGuests = randomInt(1, unit.maxGuests)
     const nightlyRate = randomInt(150, 800)
     const totalAmount = nightlyRate * nights
     const channelFee = channel ? totalAmount * 0.03 : 0
-    const cleaningFee = Number(property.cleaningFee)
+    const cleaningFee = Number(unit.cleaningFee)
     const netAmount = totalAmount - channelFee
 
     const reservation = await prisma.reservation.create({
       data: {
         tenantId: tenant.id,
-        propertyId: property.id,
+        unitId: unit.id,
         channelId: channel?.id,
         externalReservationId: channel ? `${channel.name.substring(0, 3).toUpperCase()}-${randomInt(100000, 999999)}` : null,
         guestName: `${firstName} ${lastName}`,
@@ -357,10 +426,9 @@ async function main() {
   console.log("✅ Criando tarefas...")
 
   const taskTypes = ["CLEANING", "MAINTENANCE", "INSPECTION", "OTHER"] as const
-  const taskStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
 
   for (let i = 0; i < 25; i++) {
-    const property = randomItem(activeProperties)
+    const unit = randomItem(activeUnits)
     const type = randomItem([...taskTypes])
     const titles = taskTitles[type]
     const title = randomItem(titles)
@@ -385,17 +453,17 @@ async function main() {
     }
 
     const relatedReservation = Math.random() > 0.5
-      ? reservations.find((r) => r.propertyId === property.id)
+      ? reservations.find((r) => r.unitId === unit.id)
       : null
 
     await prisma.task.create({
       data: {
         tenantId: tenant.id,
-        propertyId: property.id,
+        unitId: unit.id,
         reservationId: relatedReservation?.id,
         type: type as any,
         title,
-        description: `${title} para ${property.name}`,
+        description: `${title} para ${unit.name}`,
         assignedToId: Math.random() > 0.3 ? randomItem(operadores).id : null,
         status: status as any,
         scheduledDate: addDays(today, scheduledOffset),
@@ -412,7 +480,7 @@ async function main() {
     await prisma.transaction.create({
       data: {
         tenantId: tenant.id,
-        propertyId: reservation.propertyId,
+        unitId: reservation.unitId,
         reservationId: reservation.id,
         type: "INCOME",
         category: "Reserva",
@@ -427,7 +495,7 @@ async function main() {
 
   // Despesas variadas
   for (let i = 0; i < 50; i++) {
-    const property = randomItem(activeProperties)
+    const unit = randomItem(activeUnits)
     const category = randomItem(expenseCategories)
     const daysAgo = randomInt(0, 90)
 
@@ -446,12 +514,12 @@ async function main() {
     await prisma.transaction.create({
       data: {
         tenantId: tenant.id,
-        propertyId: property.id,
+        unitId: unit.id,
         type: "EXPENSE",
         category,
         amount,
         date: addDays(today, -daysAgo),
-        description: `${category} - ${property.name}`,
+        description: `${category} - ${unit.name}`,
         createdById: randomItem([admin, gerente]).id,
         reconciled: daysAgo > 30,
       },
@@ -459,8 +527,6 @@ async function main() {
   }
 
   console.log("💸 Criando repasses...")
-
-  const payoutStatuses = ["PENDING", "PROCESSING", "PAID"]
 
   for (let i = 0; i < 15; i++) {
     const owner = randomItem(owners)
@@ -504,13 +570,13 @@ async function main() {
   console.log("🗓️ Criando bloqueios de calendario...")
 
   for (let i = 0; i < 5; i++) {
-    const property = randomItem(activeProperties)
+    const unit = randomItem(activeUnits)
     const startOffset = randomInt(10, 60)
     const duration = randomInt(2, 7)
 
     await prisma.calendarBlock.create({
       data: {
-        propertyId: property.id,
+        unitId: unit.id,
         startDate: addDays(today, startOffset),
         endDate: addDays(today, startOffset + duration),
         reason: randomItem([
@@ -527,7 +593,7 @@ async function main() {
   console.log("📝 Criando logs de atividade...")
 
   const actions = ["CREATE", "UPDATE", "DELETE", "LOGIN", "STATUS_CHANGE"]
-  const entityTypes = ["property", "reservation", "task", "transaction", "user"]
+  const entityTypes = ["property", "unit", "reservation", "task", "transaction", "user"]
 
   for (let i = 0; i < 30; i++) {
     const user = randomItem(allUsers)
@@ -555,6 +621,7 @@ async function main() {
     users: await prisma.user.count(),
     owners: await prisma.owner.count(),
     properties: await prisma.property.count(),
+    units: await prisma.unit.count(),
     reservations: await prisma.reservation.count(),
     tasks: await prisma.task.count(),
     transactions: await prisma.transaction.count(),
@@ -571,7 +638,8 @@ async function main() {
   console.log("📊 Dados criados:")
   console.log(`   - ${counts.users} Usuarios`)
   console.log(`   - ${counts.owners} Proprietarios`)
-  console.log(`   - ${counts.properties} Imoveis`)
+  console.log(`   - ${counts.properties} Propriedades`)
+  console.log(`   - ${counts.units} Unidades`)
   console.log(`   - ${counts.reservations} Reservas`)
   console.log(`   - ${counts.tasks} Tarefas`)
   console.log(`   - ${counts.transactions} Transacoes`)

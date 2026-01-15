@@ -12,6 +12,8 @@ type CalendarEvent = {
   end: Date
   type: "reservation" | "block"
   status?: string
+  unitId: string
+  unitName: string
   propertyId: string
   propertyName: string
   guestName?: string
@@ -23,7 +25,11 @@ type CalendarEventsResult = {
   blocks: CalendarEvent[]
 }
 
-export async function getCalendarEvents(startDate: Date, endDate: Date, propertyId?: string): Promise<CalendarEventsResult> {
+export async function getCalendarEvents(
+  startDate: Date,
+  endDate: Date,
+  filters?: { propertyId?: string; unitId?: string }
+): Promise<CalendarEventsResult> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
@@ -31,7 +37,7 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
   // Criar chave de cache com base nos parâmetros
   const startKey = startDate.toISOString().split('T')[0]
   const endKey = endDate.toISOString().split('T')[0]
-  const cacheKey = `calendar:${tenantId}:${startKey}:${endKey}:${propertyId || 'all'}`
+  const cacheKey = `calendar:${tenantId}:${startKey}:${endKey}:${filters?.propertyId || 'all'}:${filters?.unitId || 'all'}`
 
   return cache.getOrSet<CalendarEventsResult>(
     cacheKey,
@@ -40,7 +46,11 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
         prisma.reservation.findMany({
           where: {
             tenantId,
-            ...(propertyId && { propertyId }),
+            unit: {
+              deletedAt: null,
+              ...(filters?.unitId && { id: filters.unitId }),
+              ...(filters?.propertyId && { propertyId: filters.propertyId }),
+            },
             OR: [
               { checkinDate: { gte: startDate, lte: endDate } },
               { checkoutDate: { gte: startDate, lte: endDate } },
@@ -54,15 +64,21 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
             status: { notIn: ["CANCELLED", "NO_SHOW"] },
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
             channel: { select: { name: true } },
           },
         }),
         prisma.calendarBlock.findMany({
           where: {
-            property: {
-              tenantId,
-              ...(propertyId && { id: propertyId }),
+            unit: {
+              deletedAt: null,
+              property: { tenantId },
+              ...(filters?.unitId && { id: filters.unitId }),
+              ...(filters?.propertyId && { propertyId: filters.propertyId }),
             },
             OR: [
               { startDate: { gte: startDate, lte: endDate } },
@@ -76,7 +92,11 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
             ],
           },
           include: {
-            property: { select: { name: true } },
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
           },
         }),
       ])
@@ -84,13 +104,15 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
       const result = {
         reservations: reservations.map((r) => ({
           id: r.id,
-          title: `${r.guestName} - ${r.property.name}`,
+          title: `${r.guestName} - ${r.unit.property.name} - ${r.unit.name}`,
           start: r.checkinDate,
           end: r.checkoutDate,
           type: "reservation" as const,
           status: r.status,
-          propertyId: r.propertyId,
-          propertyName: r.property.name,
+          unitId: r.unitId,
+          unitName: r.unit.name,
+          propertyId: r.unit.property.id,
+          propertyName: r.unit.property.name,
           guestName: r.guestName,
           channel: r.channel?.name,
         })),
@@ -100,8 +122,10 @@ export async function getCalendarEvents(startDate: Date, endDate: Date, property
           start: b.startDate,
           end: b.endDate,
           type: "block" as const,
-          propertyId: b.propertyId,
-          propertyName: b.property.name,
+          unitId: b.unitId,
+          unitName: b.unit.name,
+          propertyId: b.unit.property.id,
+          propertyName: b.unit.property.name,
         })),
       }
 
@@ -120,26 +144,31 @@ export async function createCalendarBlock(formData: FormData) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  const propertyId = formData.get("propertyId") as string
+  const unitId = formData.get("unitId") as string
   const startDate = new Date(formData.get("startDate") as string)
   const endDate = new Date(formData.get("endDate") as string)
   const reason = (formData.get("reason") as string) || null
 
-  if (!propertyId || !startDate || !endDate) {
+  if (!unitId || !startDate || !endDate) {
     return { error: "Campos obrigatorios nao preenchidos" }
   }
 
-  const property = await prisma.property.findFirst({
-    where: { id: propertyId, tenantId: session.user.tenantId },
+  // Verify unit belongs to tenant
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: unitId,
+      property: { tenantId: session.user.tenantId },
+      deletedAt: null,
+    },
   })
 
-  if (!property) {
-    return { error: "Imovel nao encontrado" }
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
   }
 
   await prisma.calendarBlock.create({
     data: {
-      propertyId,
+      unitId,
       startDate,
       endDate,
       reason,
@@ -159,10 +188,16 @@ export async function deleteCalendarBlock(id: string) {
 
   const block = await prisma.calendarBlock.findFirst({
     where: { id },
-    include: { property: true },
+    include: {
+      unit: {
+        include: {
+          property: { select: { tenantId: true } },
+        },
+      },
+    },
   })
 
-  if (!block || block.property.tenantId !== session.user.tenantId) {
+  if (!block || block.unit.property.tenantId !== session.user.tenantId) {
     return { error: "Bloqueio nao encontrado" }
   }
 

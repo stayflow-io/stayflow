@@ -31,7 +31,11 @@ export async function GET(request: Request) {
   const transactions = await prisma.transaction.findMany({
     where,
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
     },
     orderBy: { date: "desc" },
   })
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
     Tipo: typeMap[t.type] || t.type,
     Categoria: t.category,
     Descricao: t.description || "",
-    Imovel: t.property.name,
+    Imovel: `${t.unit.property.name} - ${t.unit.name}`,
     Valor: t.type === "INCOME" ? Number(t.amount) : -Number(t.amount),
   }))
 

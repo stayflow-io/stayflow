@@ -93,10 +93,10 @@ export function CalendarView({ properties, owners }: CalendarViewProps) {
       setIsLoading(true)
       const start = startOfMonth(currentDate)
       const end = endOfMonth(currentDate)
-      const propertyId = selectedProperty === "all" ? undefined : selectedProperty
+      const filters = selectedProperty === "all" ? undefined : { propertyId: selectedProperty }
 
       try {
-        const data = await getCalendarEvents(start, end, propertyId)
+        const data = await getCalendarEvents(start, end, filters)
         let reservations = data.reservations.map((r) => ({
           ...r,
           start: new Date(r.start),

@@ -10,19 +10,24 @@ export interface OwnerReportData {
   periodEnd: Date
   properties: {
     name: string
-    reservations: {
-      guestName: string
-      checkinDate: Date
-      checkoutDate: Date
-      totalAmount: number
-      channelFee: number
-      cleaningFee: number
-      netAmount: number
-    }[]
-    expenses: {
-      description: string
-      date: Date
-      amount: number
+    units: {
+      name: string
+      reservations: {
+        guestName: string
+        checkinDate: Date
+        checkoutDate: Date
+        totalAmount: number
+        channelFee: number
+        cleaningFee: number
+        netAmount: number
+      }[]
+      expenses: {
+        description: string
+        date: Date
+        amount: number
+      }[]
+      totalRevenue: number
+      totalExpenses: number
     }[]
     totalRevenue: number
     totalExpenses: number
@@ -45,6 +50,7 @@ export async function getOwnerReportData(
   const start = periodStart || startOfMonth(subMonths(new Date(), 1))
   const end = periodEnd || endOfMonth(subMonths(new Date(), 1))
 
+  // Get owner with their properties and units
   const owner = await prisma.owner.findFirst({
     where: {
       id: ownerId,
@@ -52,7 +58,46 @@ export async function getOwnerReportData(
     },
     include: {
       properties: {
+        where: { deletedAt: null },
         include: {
+          units: {
+            where: { deletedAt: null },
+            include: {
+              reservations: {
+                where: {
+                  checkoutDate: {
+                    gte: start,
+                    lte: end,
+                  },
+                  status: {
+                    in: ["CHECKED_OUT", "CONFIRMED"],
+                  },
+                },
+                orderBy: {
+                  checkinDate: "asc",
+                },
+              },
+              transactions: {
+                where: {
+                  type: "EXPENSE",
+                  date: {
+                    gte: start,
+                    lte: end,
+                  },
+                },
+                orderBy: {
+                  date: "asc",
+                },
+              },
+            },
+          },
+        },
+      },
+      // Also get units directly owned by this owner
+      units: {
+        where: { deletedAt: null },
+        include: {
+          property: true,
           reservations: {
             where: {
               checkoutDate: {
@@ -89,35 +134,101 @@ export async function getOwnerReportData(
   let grossAmount = 0
   let totalExpenses = 0
 
-  const properties = owner.properties.map((property) => {
-    const propertyRevenue = property.reservations.reduce(
-      (sum, r) => sum + Number(r.netAmount),
-      0
-    )
-    const propertyExpenses = property.transactions.reduce(
-      (sum, t) => sum + Number(t.amount),
-      0
-    )
+  // Group units by property for the report
+  const propertyMap = new Map<string, {
+    name: string
+    units: {
+      name: string
+      reservations: typeof owner.units[0]["reservations"]
+      transactions: typeof owner.units[0]["transactions"]
+      adminFeePercent: number
+    }[]
+  }>()
+
+  // Add units from properties owned by this owner (where unit.ownerId is null - inherited ownership)
+  for (const property of owner.properties) {
+    const inheritedUnits = property.units.filter(u => u.ownerId === null)
+    if (inheritedUnits.length > 0) {
+      propertyMap.set(property.id, {
+        name: property.name,
+        units: inheritedUnits.map(u => ({
+          name: u.name,
+          reservations: u.reservations,
+          transactions: u.transactions,
+          adminFeePercent: Number(u.adminFeePercent),
+        })),
+      })
+    }
+  }
+
+  // Add units directly owned by this owner
+  for (const unit of owner.units) {
+    const existing = propertyMap.get(unit.propertyId)
+    if (existing) {
+      existing.units.push({
+        name: unit.name,
+        reservations: unit.reservations,
+        transactions: unit.transactions,
+        adminFeePercent: Number(unit.adminFeePercent),
+      })
+    } else {
+      propertyMap.set(unit.propertyId, {
+        name: unit.property.name,
+        units: [{
+          name: unit.name,
+          reservations: unit.reservations,
+          transactions: unit.transactions,
+          adminFeePercent: Number(unit.adminFeePercent),
+        }],
+      })
+    }
+  }
+
+  // Calculate totals per property
+  const properties = Array.from(propertyMap.values()).map((property) => {
+    let propertyRevenue = 0
+    let propertyExpenses = 0
+
+    const units = property.units.map((unit) => {
+      const unitRevenue = unit.reservations.reduce(
+        (sum, r) => sum + Number(r.netAmount),
+        0
+      )
+      const unitExpenses = unit.transactions.reduce(
+        (sum, t) => sum + Number(t.amount),
+        0
+      )
+
+      propertyRevenue += unitRevenue
+      propertyExpenses += unitExpenses
+
+      return {
+        name: unit.name,
+        reservations: unit.reservations.map((r) => ({
+          guestName: r.guestName,
+          checkinDate: r.checkinDate,
+          checkoutDate: r.checkoutDate,
+          totalAmount: Number(r.totalAmount),
+          channelFee: Number(r.channelFee),
+          cleaningFee: Number(r.cleaningFee),
+          netAmount: Number(r.netAmount),
+        })),
+        expenses: unit.transactions.map((t) => ({
+          description: t.description || t.category,
+          date: t.date,
+          amount: Number(t.amount),
+        })),
+        totalRevenue: unitRevenue,
+        totalExpenses: unitExpenses,
+      }
+    })
 
     grossAmount += propertyRevenue
     totalExpenses += propertyExpenses
 
     return {
       name: property.name,
-      reservations: property.reservations.map((r) => ({
-        guestName: r.guestName,
-        checkinDate: r.checkinDate,
-        checkoutDate: r.checkoutDate,
-        totalAmount: Number(r.totalAmount),
-        channelFee: Number(r.channelFee),
-        cleaningFee: Number(r.cleaningFee),
-        netAmount: Number(r.netAmount),
-      })),
-      expenses: property.transactions.map((t) => ({
-        description: t.description || t.category,
-        date: t.date,
-        amount: Number(t.amount),
-      })),
+      units,
       totalRevenue: propertyRevenue,
       totalExpenses: propertyExpenses,
     }
@@ -145,6 +256,7 @@ export interface ReservationsReportData {
   periodEnd: Date
   reservations: {
     property: string
+    unit: string
     guestName: string
     checkinDate: Date
     checkoutDate: Date
@@ -189,7 +301,11 @@ export async function getReservationsReportData(
       },
     },
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
     },
     orderBy: {
       checkinDate: "asc",
@@ -201,7 +317,8 @@ export async function getReservationsReportData(
       (r.checkoutDate.getTime() - r.checkinDate.getTime()) / (1000 * 60 * 60 * 24)
     )
     return {
-      property: r.property.name,
+      property: r.unit.property.name,
+      unit: r.unit.name,
       guestName: r.guestName,
       checkinDate: r.checkinDate,
       checkoutDate: r.checkoutDate,
@@ -243,7 +360,11 @@ export async function getRevenueForecast() {
       },
     },
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
     },
     orderBy: {
       checkinDate: "asc",
@@ -290,6 +411,7 @@ export interface FinancialTransactionsReportData {
     type: string
     category: string
     property: string
+    unit: string
     description: string
     amount: number
   }[]
@@ -319,7 +441,11 @@ export async function getFinancialReportData(
       },
     },
     include: {
-      property: true,
+      unit: {
+        include: {
+          property: true,
+        },
+      },
     },
     orderBy: {
       date: "desc",
@@ -330,7 +456,8 @@ export async function getFinancialReportData(
     date: t.date,
     type: t.type,
     category: t.category,
-    property: t.property.name,
+    property: t.unit.property.name,
+    unit: t.unit.name,
     description: t.description || "",
     amount: Number(t.amount),
   }))

@@ -93,7 +93,7 @@ export default async function ReservationsPage({ searchParams }: Props) {
                             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-muted-foreground">
                               <span className="flex items-center">
                                 <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                                <span className="truncate max-w-[120px] sm:max-w-none">{reservation.property.name}</span>
+                                <span className="truncate max-w-[120px] sm:max-w-none">{reservation.unit.property.name} - {reservation.unit.name}</span>
                               </span>
                               <span className="flex items-center">
                                 <Users className="h-3 w-3 mr-1 flex-shrink-0" />

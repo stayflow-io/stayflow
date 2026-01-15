@@ -52,7 +52,7 @@ export default async function ReservationDetailPage({ params }: Props) {
             </div>
             <div className="flex items-center text-sm sm:text-base text-muted-foreground mt-1">
               <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
-              <span className="truncate">{reservation.property.name}</span>
+              <span className="truncate">{reservation.unit.property.name} - {reservation.unit.name}</span>
             </div>
           </div>
         </div>
@@ -212,12 +212,12 @@ export default async function ReservationDetailPage({ params }: Props) {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="font-medium">{reservation.property.name}</p>
+              <p className="font-medium">{reservation.unit.property.name} - {reservation.unit.name}</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Proprietario: {reservation.property.owner.name}
+                Proprietario: {reservation.unit.owner?.name || reservation.unit.property.owner?.name || "Nenhum"}
               </p>
               <Button variant="link" className="px-0 mt-2" asChild>
-                <Link href={`/properties/${reservation.property.id}`}>
+                <Link href={`/properties/${reservation.unit.property.id}`}>
                   Ver imovel
                 </Link>
               </Button>

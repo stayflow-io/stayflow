@@ -119,7 +119,7 @@ export default async function FinancialPage() {
                       <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
                         <span className="flex items-center">
                           <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                          <span className="truncate max-w-[100px] sm:max-w-[150px]">{transaction.property.name}</span>
+                          <span className="truncate max-w-[100px] sm:max-w-[150px]">{transaction.unit.property.name} - {transaction.unit.name}</span>
                         </span>
                         {transaction.description && (
                           <span className="truncate max-w-[120px] sm:max-w-none">- {transaction.description}</span>

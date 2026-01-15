@@ -4,34 +4,42 @@ import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { cache, cacheKeys, TTL } from "@/lib/redis"
 
-type ReservationWithProperty = {
+type ReservationWithUnit = {
   id: string
   guestName: string
   checkinDate: string
   checkoutDate: string
   numGuests: number
   status: string
-  property: { id: string; name: string }
+  unit: {
+    id: string
+    name: string
+    property: { id: string; name: string }
+  }
 }
 
-type TaskWithProperty = {
+type TaskWithUnit = {
   id: string
   title: string
   type: string
   scheduledDate: string
   status: string
-  property: { id: string; name: string } | null
+  unit: {
+    id: string
+    name: string
+    property: { id: string; name: string }
+  } | null
 }
 
 type DashboardStats = {
-  propertiesCount: number
+  unitsCount: number
   reservationsThisMonth: number
   pendingTasksCount: number
   revenueThisMonth: number
-  upcomingCheckins: ReservationWithProperty[]
-  todayTasks: TaskWithProperty[]
-  todayCheckins: ReservationWithProperty[]
-  todayCheckouts: ReservationWithProperty[]
+  upcomingCheckins: ReservationWithUnit[]
+  todayTasks: TaskWithUnit[]
+  todayCheckins: ReservationWithUnit[]
+  todayCheckouts: ReservationWithUnit[]
   overdueTasks: number
   pendingPayouts: number
 }
@@ -53,7 +61,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
       const [
-        propertiesCount,
+        unitsCount,
         reservationsThisMonth,
         pendingTasksCount,
         revenueThisMonth,
@@ -64,8 +72,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         overdueTasks,
         pendingPayouts,
       ] = await Promise.all([
-        prisma.property.count({
-          where: { tenantId, status: "ACTIVE", deletedAt: null },
+        prisma.unit.count({
+          where: {
+            property: { tenantId },
+            status: "ACTIVE",
+            deletedAt: null,
+          },
         }),
         prisma.reservation.count({
           where: {
@@ -95,7 +107,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             checkinDate: { gte: tomorrow, lte: in7Days },
             status: "CONFIRMED",
           },
-          include: { property: true },
+          include: {
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
           orderBy: { checkinDate: "asc" },
           take: 5,
         }),
@@ -105,7 +123,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             scheduledDate: { gte: today, lt: tomorrow },
             status: { in: ["PENDING", "IN_PROGRESS"] },
           },
-          include: { property: true },
+          include: {
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
           orderBy: { scheduledDate: "asc" },
           take: 5,
         }),
@@ -115,7 +139,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             checkinDate: { gte: today, lt: tomorrow },
             status: "CONFIRMED",
           },
-          include: { property: true },
+          include: {
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
           orderBy: { checkinDate: "asc" },
         }),
         prisma.reservation.findMany({
@@ -124,7 +154,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
             checkoutDate: { gte: today, lt: tomorrow },
             status: "CHECKED_IN",
           },
-          include: { property: true },
+          include: {
+            unit: {
+              include: {
+                property: { select: { id: true, name: true } },
+              },
+            },
+          },
           orderBy: { checkoutDate: "asc" },
         }),
         prisma.task.count({
@@ -143,7 +179,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       ])
 
       return JSON.parse(JSON.stringify({
-        propertiesCount,
+        unitsCount,
         reservationsThisMonth,
         pendingTasksCount,
         revenueThisMonth: revenueThisMonth._sum.totalAmount?.toNumber() || 0,
@@ -215,11 +251,11 @@ export async function getRevenueByMonth() {
 
       return months
     },
-    TTL.MEDIUM // 5 minutos
+    TTL.MEDIUM
   )
 }
 
-export async function getOccupancyByProperty() {
+export async function getOccupancyByUnit() {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
@@ -233,9 +269,14 @@ export async function getOccupancyByProperty() {
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       const daysInMonth = endOfMonth.getDate()
 
-      const properties = await prisma.property.findMany({
-        where: { tenantId, status: "ACTIVE", deletedAt: null },
+      const units = await prisma.unit.findMany({
+        where: {
+          property: { tenantId },
+          status: "ACTIVE",
+          deletedAt: null,
+        },
         include: {
+          property: { select: { name: true } },
           reservations: {
             where: {
               checkinDate: { lte: endOfMonth },
@@ -247,10 +288,10 @@ export async function getOccupancyByProperty() {
         take: 10,
       })
 
-      return properties.map((property) => {
+      return units.map((unit) => {
         let occupiedDays = 0
 
-        for (const reservation of property.reservations) {
+        for (const reservation of unit.reservations) {
           const checkin = new Date(Math.max(reservation.checkinDate.getTime(), startOfMonth.getTime()))
           const checkout = new Date(Math.min(reservation.checkoutDate.getTime(), endOfMonth.getTime()))
           const days = Math.ceil((checkout.getTime() - checkin.getTime()) / (1000 * 60 * 60 * 24))
@@ -258,9 +299,10 @@ export async function getOccupancyByProperty() {
         }
 
         const occupancy = (occupiedDays / daysInMonth) * 100
+        const displayName = `${unit.property.name} - ${unit.name}`
 
         return {
-          property: property.name.length > 15 ? property.name.slice(0, 15) + "..." : property.name,
+          unit: displayName.length > 20 ? displayName.slice(0, 20) + "..." : displayName,
           occupancy: Math.min(100, occupancy),
         }
       })
@@ -312,6 +354,6 @@ export async function getReservationsByStatus(): Promise<ReservationStatusCount[
         color: statusConfig[item.status]?.color || "#6b7280",
       }))
     },
-    TTL.MEDIUM // 5 minutos
+    TTL.MEDIUM
   )
 }

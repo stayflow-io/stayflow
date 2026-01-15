@@ -2,7 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { format } from "date-fns"
 
-// Generate iCal feed for a property
+// Generate iCal feed for all units of a property
 export async function GET(
   request: Request,
   { params }: { params: { propertyId: string } }
@@ -10,12 +10,17 @@ export async function GET(
   const property = await prisma.property.findUnique({
     where: { id: params.propertyId },
     include: {
-      reservations: {
-        where: {
-          status: { in: ["CONFIRMED", "CHECKED_IN"] },
-          checkoutDate: { gte: new Date() },
+      units: {
+        where: { deletedAt: null },
+        include: {
+          reservations: {
+            where: {
+              status: { in: ["CONFIRMED", "CHECKED_IN"] },
+              checkoutDate: { gte: new Date() },
+            },
+            orderBy: { checkinDate: "asc" },
+          },
         },
-        orderBy: { checkinDate: "asc" },
       },
     },
   })
@@ -24,12 +29,20 @@ export async function GET(
     return new NextResponse("Property not found", { status: 404 })
   }
 
-  const icalEvents = property.reservations.map((reservation) => {
+  // Gather all reservations from all units
+  const allReservations = property.units.flatMap((unit) =>
+    unit.reservations.map((reservation) => ({
+      ...reservation,
+      unitName: unit.name,
+    }))
+  )
+
+  const icalEvents = allReservations.map((reservation) => {
     const uid = `${reservation.id}@stayflow`
     const dtstart = format(reservation.checkinDate, "yyyyMMdd")
     const dtend = format(reservation.checkoutDate, "yyyyMMdd")
-    const summary = `Reserva - ${reservation.guestName}`
-    const description = `Hospede: ${reservation.guestName}\\nHospedes: ${reservation.numGuests}\\nStatus: ${reservation.status}`
+    const summary = `Reserva - ${reservation.guestName} (${reservation.unitName})`
+    const description = `Hospede: ${reservation.guestName}\\nUnidade: ${reservation.unitName}\\nHospedes: ${reservation.numGuests}\\nStatus: ${reservation.status}`
 
     return `BEGIN:VEVENT
 UID:${uid}

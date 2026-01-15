@@ -10,8 +10,8 @@ import {
   ResponsiveContainer,
 } from "recharts"
 
-interface OccupancyData {
-  property: string
+export interface OccupancyData {
+  unit: string
   occupancy: number
 }
 
@@ -33,7 +33,7 @@ export function OccupancyChart({ data }: Props) {
         />
         <YAxis
           type="category"
-          dataKey="property"
+          dataKey="unit"
           className="text-xs"
           tick={{ fill: "hsl(var(--muted-foreground))" }}
           width={70}

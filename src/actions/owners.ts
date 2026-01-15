@@ -11,7 +11,7 @@ type OwnerWithCount = {
   name: string
   email: string
   phone: string | null
-  _count: { properties: number }
+  _count: { properties: number; units: number }
   [key: string]: unknown
 }
 
@@ -30,7 +30,7 @@ export async function getOwners(): Promise<OwnerWithCount[]> {
           deletedAt: null,
         },
         include: {
-          _count: { select: { properties: true } },
+          _count: { select: { properties: true, units: true } },
         },
         orderBy: { name: "asc" },
       })
@@ -59,9 +59,22 @@ export async function getOwner(id: string) {
           properties: {
             where: { deletedAt: null },
             include: {
-              photos: { take: 1, orderBy: { order: "asc" } },
+              units: {
+                where: { deletedAt: null },
+                include: {
+                  photos: { take: 1, orderBy: { order: "asc" } },
+                },
+              },
             },
             take: 50, // Limitar para evitar queries muito grandes
+          },
+          units: {
+            where: { deletedAt: null },
+            include: {
+              property: { select: { id: true, name: true } },
+              photos: { take: 1, orderBy: { order: "asc" } },
+            },
+            take: 50,
           },
           payouts: { orderBy: { periodEnd: "desc" }, take: 12 },
         },
@@ -166,16 +179,25 @@ export async function deleteOwner(id: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  const propertiesCount = await prisma.property.count({
-    where: {
-      ownerId: id,
-      tenantId: session.user.tenantId,
-      deletedAt: null,
-    },
-  })
+  // Check if owner has properties or units
+  const [propertiesCount, unitsCount] = await Promise.all([
+    prisma.property.count({
+      where: {
+        ownerId: id,
+        tenantId: session.user.tenantId,
+        deletedAt: null,
+      },
+    }),
+    prisma.unit.count({
+      where: {
+        ownerId: id,
+        deletedAt: null,
+      },
+    }),
+  ])
 
-  if (propertiesCount > 0) {
-    return { error: "Nao e possivel excluir proprietario com imoveis vinculados" }
+  if (propertiesCount > 0 || unitsCount > 0) {
+    return { error: "Nao e possivel excluir proprietario com imoveis ou unidades vinculadas" }
   }
 
   await prisma.owner.update({

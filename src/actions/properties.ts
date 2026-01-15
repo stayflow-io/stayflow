@@ -22,7 +22,7 @@ export async function createProperty(data: any) {
   // Invalidar cache
   await cache.del(cacheKeys.properties(session.user.tenantId))
 
-  revalidatePath("/dashboard/properties")
+  revalidatePath("/properties")
   return { success: true, id: property.id }
 }
 
@@ -44,16 +44,29 @@ export async function getProperties(filters?: {
     tenantId: session.user.tenantId,
     deletedAt: null,
     ...(filters?.status && { status: filters.status }),
-    ...(filters?.ownerId && { ownerId: filters.ownerId }),
+  }
+
+  // Filter by owner - check both property.ownerId and units with that ownerId
+  if (filters?.ownerId) {
+    where.OR = [
+      { ownerId: filters.ownerId },
+      { units: { some: { ownerId: filters.ownerId } } },
+    ]
   }
 
   const [items, total] = await Promise.all([
     prisma.property.findMany({
       where,
       include: {
-        owner: true,
-        photos: { orderBy: { order: "asc" }, take: 1 },
-        _count: { select: { reservations: true } },
+        owner: { select: { id: true, name: true } },
+        units: {
+          where: { deletedAt: null },
+          include: {
+            photos: { take: 1, orderBy: { order: "asc" } },
+            owner: { select: { id: true, name: true } },
+          },
+        },
+        _count: { select: { units: { where: { deletedAt: null } } } },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -77,8 +90,6 @@ type PropertyBasic = {
   id: string
   name: string
   ownerId: string | null
-  maxGuests: number
-  cleaningFee: number | string
   [key: string]: unknown
 }
 
@@ -112,17 +123,29 @@ export async function getPropertyById(id: string) {
   return cache.getOrSet<any>(
     cacheKeys.property(id),
     async () => {
-      const property = await prisma.property.findUnique({
-        where: { id },
+      const property = await prisma.property.findFirst({
+        where: {
+          id,
+          tenantId: session.user.tenantId,
+          deletedAt: null,
+        },
         include: {
           owner: true,
-          photos: { orderBy: { order: "asc" } },
+          units: {
+            where: { deletedAt: null },
+            include: {
+              photos: { orderBy: { order: "asc" } },
+              owner: { select: { id: true, name: true } },
+              _count: { select: { reservations: true } },
+            },
+            orderBy: { name: "asc" },
+          },
           channels: { include: { channel: true } },
         },
       })
       return property ? JSON.parse(JSON.stringify(property)) : null
     },
-    TTL.MEDIUM // 5 minutos
+    TTL.MEDIUM
   )
 }
 
@@ -138,10 +161,14 @@ export async function updateProperty(id: string, data: any) {
   })
 
   // Invalidar cache
-  await cache.del(cacheKeys.properties(session.user.tenantId))
-  await cache.del(cacheKeys.property(id))
+  await Promise.all([
+    cache.del(cacheKeys.properties(session.user.tenantId)),
+    cache.del(cacheKeys.property(id)),
+    cache.del(cacheKeys.units(session.user.tenantId)),
+  ])
 
-  revalidatePath("/dashboard/properties")
+  revalidatePath("/properties")
+  revalidatePath(`/properties/${id}`)
   return { success: true, id: property.id }
 }
 
@@ -149,15 +176,47 @@ export async function deleteProperty(id: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  await prisma.property.update({
+  // Check if property has any units with reservations
+  const property = await prisma.property.findFirst({
     where: { id, tenantId: session.user.tenantId },
-    data: { deletedAt: new Date() },
+    include: {
+      units: {
+        where: { deletedAt: null },
+        include: {
+          _count: { select: { reservations: true } },
+        },
+      },
+    },
   })
 
-  // Invalidar cache
-  await cache.del(cacheKeys.properties(session.user.tenantId))
-  await cache.del(cacheKeys.property(id))
+  if (!property) {
+    return { error: "Propriedade nao encontrada" }
+  }
 
-  revalidatePath("/dashboard/properties")
+  const hasReservations = property.units.some((u) => u._count.reservations > 0)
+  if (hasReservations) {
+    return { error: "Nao e possivel excluir propriedade com unidades que tem reservas" }
+  }
+
+  // Soft delete property and all its units
+  await prisma.$transaction([
+    prisma.unit.updateMany({
+      where: { propertyId: id },
+      data: { deletedAt: new Date() },
+    }),
+    prisma.property.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    }),
+  ])
+
+  // Invalidar cache
+  await Promise.all([
+    cache.del(cacheKeys.properties(session.user.tenantId)),
+    cache.del(cacheKeys.property(id)),
+    cache.del(cacheKeys.units(session.user.tenantId)),
+  ])
+
+  revalidatePath("/properties")
   return { success: true }
 }
