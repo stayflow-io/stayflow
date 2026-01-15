@@ -45,22 +45,31 @@ export async function getOwner(id: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  return prisma.owner.findFirst({
-    where: {
-      id,
-      tenantId: session.user.tenantId,
-      deletedAt: null,
-    },
-    include: {
-      properties: {
-        where: { deletedAt: null },
-        include: {
-          photos: { take: 1, orderBy: { order: "asc" } },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return cache.getOrSet<any>(
+    cacheKeys.owner(id),
+    async () => {
+      const owner = await prisma.owner.findFirst({
+        where: {
+          id,
+          tenantId: session.user.tenantId,
+          deletedAt: null,
         },
-      },
-      payouts: { orderBy: { periodEnd: "desc" }, take: 12 },
+        include: {
+          properties: {
+            where: { deletedAt: null },
+            include: {
+              photos: { take: 1, orderBy: { order: "asc" } },
+            },
+            take: 50, // Limitar para evitar queries muito grandes
+          },
+          payouts: { orderBy: { periodEnd: "desc" }, take: 12 },
+        },
+      })
+      return owner ? JSON.parse(JSON.stringify(owner)) : null
     },
-  })
+    TTL.MEDIUM // 5 minutos
+  )
 }
 
 export async function createOwner(formData: FormData) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { cache, cacheKeys } from "@/lib/redis"
 
 export async function getPayouts(filters?: { ownerId?: string; status?: string }) {
   const session = await auth()
@@ -40,49 +41,68 @@ export async function calculatePayoutPreview(ownerId: string, periodStart: Date,
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  // Buscar proprietário com taxa de comissão
-  const owner = await prisma.owner.findFirst({
-    where: { id: ownerId, tenantId: session.user.tenantId },
-  })
+  // Buscar proprietário e imóveis em paralelo para otimizar
+  const [owner, properties] = await Promise.all([
+    prisma.owner.findFirst({
+      where: { id: ownerId, tenantId: session.user.tenantId },
+    }),
+    prisma.property.findMany({
+      where: { ownerId, deletedAt: null },
+      select: { id: true, adminFeePercent: true },
+    }),
+  ])
 
   if (!owner) {
     return { error: "Proprietario nao encontrado" }
   }
 
-  // Buscar imóveis do proprietário
-  const properties = await prisma.property.findMany({
-    where: { ownerId, deletedAt: null },
-    select: { id: true, adminFeePercent: true },
-  })
-
   const propertyIds = properties.map((p) => p.id)
 
-  // Buscar reservas concluídas no período
-  const reservations = await prisma.reservation.findMany({
-    where: {
-      propertyId: { in: propertyIds },
-      status: "CHECKED_OUT",
-      checkoutDate: {
-        gte: periodStart,
-        lte: periodEnd,
+  // Se não houver imóveis, retornar zerado
+  if (propertyIds.length === 0) {
+    return {
+      success: true,
+      preview: {
+        grossAmount: 0,
+        expenses: 0,
+        adminFee: 0,
+        netAmount: 0,
+        reservationsCount: 0,
+        expensesCount: 0,
+        commissionPercent: Number(owner.commissionPercent),
       },
-    },
-    include: {
-      property: true,
-    },
-  })
+    }
+  }
 
-  // Buscar despesas no período
-  const expenses = await prisma.transaction.findMany({
-    where: {
-      propertyId: { in: propertyIds },
-      type: "EXPENSE",
-      date: {
-        gte: periodStart,
-        lte: periodEnd,
+  // Buscar reservas e despesas em paralelo
+  const [reservations, expenses] = await Promise.all([
+    prisma.reservation.findMany({
+      where: {
+        propertyId: { in: propertyIds },
+        status: "CHECKED_OUT",
+        checkoutDate: {
+          gte: periodStart,
+          lte: periodEnd,
+        },
       },
-    },
-  })
+      select: {
+        netAmount: true,
+      },
+    }),
+    prisma.transaction.findMany({
+      where: {
+        propertyId: { in: propertyIds },
+        type: "EXPENSE",
+        date: {
+          gte: periodStart,
+          lte: periodEnd,
+        },
+      },
+      select: {
+        amount: true,
+      },
+    }),
+  ])
 
   // Calcular valores
   const grossAmount = reservations.reduce((sum, r) => sum + Number(r.netAmount), 0)
@@ -141,6 +161,12 @@ export async function createPayout(formData: FormData) {
     },
   })
 
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
+
   revalidatePath("/financial/payouts")
   revalidatePath(`/owners/${ownerId}`)
   return { success: true, id: payout.id }
@@ -166,6 +192,12 @@ export async function updatePayoutStatus(id: string, status: string) {
     },
   })
 
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
+
   revalidatePath("/financial/payouts")
   revalidatePath(`/owners/${payout.ownerId}`)
   return { success: true }
@@ -190,6 +222,12 @@ export async function deletePayout(id: string) {
   await prisma.ownerPayout.delete({
     where: { id },
   })
+
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
 
   revalidatePath("/financial/payouts")
   return { success: true }

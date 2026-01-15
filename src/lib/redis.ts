@@ -67,6 +67,7 @@ export const cacheKeys = {
   dashboardStats: (tenantId: string) => `dashboard:stats:${tenantId}`,
   revenueByMonth: (tenantId: string) => `dashboard:revenue:${tenantId}`,
   occupancy: (tenantId: string) => `dashboard:occupancy:${tenantId}`,
+  reservationsByStatus: (tenantId: string) => `dashboard:reservations-status:${tenantId}`,
 
   // Properties
   properties: (tenantId: string) => `properties:list:${tenantId}`,
@@ -79,15 +80,28 @@ export const cacheKeys = {
   // Reservations
   reservations: (tenantId: string, month: string) => `reservations:${tenantId}:${month}`,
 
+  // Calendar
+  calendar: (tenantId: string, start: string, end: string, propertyId?: string) =>
+    `calendar:${tenantId}:${start}:${end}:${propertyId || 'all'}`,
+
+  // Notifications
+  notifications: (tenantId: string) => `notifications:${tenantId}`,
+
+  // Financial
+  financialSummary: (tenantId: string, start: string, end: string) =>
+    `financial:summary:${tenantId}:${start}:${end}`,
+
   // Invalidation patterns
   tenantPattern: (tenantId: string) => `*:${tenantId}*`,
+  calendarPattern: (tenantId: string) => `calendar:${tenantId}:*`,
 }
 
 // TTL constants (in seconds)
+// Com invalidação automática, TTLs mais longos são seguros
 export const TTL = {
-  SHORT: 60,        // 1 minute
-  MEDIUM: 300,      // 5 minutes
-  LONG: 900,        // 15 minutes
+  SHORT: 300,       // 5 minutes (notifications, dados que mudam frequentemente)
+  MEDIUM: 1800,     // 30 minutes (owners, properties, dashboard)
+  LONG: 3600,       // 1 hour (dados mais estáveis)
   HOUR: 3600,       // 1 hour
   DAY: 86400,       // 24 hours
 }

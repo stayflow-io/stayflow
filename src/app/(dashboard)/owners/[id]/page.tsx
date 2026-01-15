@@ -57,7 +57,7 @@ export default async function OwnerDetailPage({ params }: Props) {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {owner.properties.map((property) => (
+                  {owner.properties.map((property: any) => (
                     <Link key={property.id} href={`/properties/${property.id}`} className="block">
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 border rounded-lg hover:shadow-md transition-shadow gap-3">
                         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -107,7 +107,7 @@ export default async function OwnerDetailPage({ params }: Props) {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {owner.payouts.map((payout) => (
+                  {owner.payouts.map((payout: any) => (
                     <div
                       key={payout.id}
                       className="flex items-center justify-between p-3 border rounded-lg"

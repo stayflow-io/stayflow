@@ -113,8 +113,11 @@ export async function createTask(formData: FormData) {
     },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
 
   revalidatePath("/tasks")
   return { success: true, id: task.id }
@@ -150,8 +153,11 @@ export async function updateTask(id: string, formData: FormData) {
     data: updateData,
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
 
   revalidatePath("/tasks")
   return { success: true }
@@ -169,8 +175,11 @@ export async function completeTask(id: string) {
     },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
 
   revalidatePath("/tasks")
   return { success: true }
@@ -184,8 +193,11 @@ export async function deleteTask(id: string) {
     where: { id, tenantId: session.user.tenantId },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+  ])
 
   revalidatePath("/tasks")
   return { success: true }

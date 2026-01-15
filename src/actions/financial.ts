@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { cache, cacheKeys, TTL } from "@/lib/redis"
 
 export async function getTransactions(filters?: {
   propertyId?: string
@@ -18,14 +19,18 @@ export async function getTransactions(filters?: {
       tenantId: session.user.tenantId,
       ...(filters?.propertyId && { propertyId: filters.propertyId }),
       ...(filters?.type && { type: filters.type as any }),
-      ...(filters?.startDate && { date: { gte: filters.startDate } }),
-      ...(filters?.endDate && { date: { lte: filters.endDate } }),
+      ...(filters?.startDate && filters?.endDate && {
+        date: { gte: filters.startDate, lte: filters.endDate },
+      }),
+      ...(filters?.startDate && !filters?.endDate && { date: { gte: filters.startDate } }),
+      ...(!filters?.startDate && filters?.endDate && { date: { lte: filters.endDate } }),
     },
     include: {
-      property: true,
-      reservation: true,
+      property: { select: { id: true, name: true } },
+      reservation: { select: { id: true, guestName: true } },
     },
     orderBy: { date: "desc" },
+    take: 100, // Limitar para evitar queries muito grandes
   })
 }
 
@@ -55,35 +60,73 @@ export async function createTransaction(formData: FormData) {
     },
   })
 
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.revenueByMonth(session.user.tenantId)),
+    cache.delPattern(`financial:summary:${session.user.tenantId}:*`),
+  ])
+
   revalidatePath("/financial")
   return { success: true, id: transaction.id }
 }
 
-export async function getFinancialSummary(startDate: Date, endDate: Date) {
+type FinancialSummary = {
+  income: number
+  expenses: number
+  net: number
+  transactionCount: number
+}
+
+export async function getFinancialSummary(startDate: Date, endDate: Date): Promise<FinancialSummary> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  const transactions = await prisma.transaction.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      date: { gte: startDate, lte: endDate },
+  const tenantId = session.user.tenantId
+  const startKey = startDate.toISOString().split('T')[0]
+  const endKey = endDate.toISOString().split('T')[0]
+
+  return cache.getOrSet<FinancialSummary>(
+    `financial:summary:${tenantId}:${startKey}:${endKey}`,
+    async () => {
+      // Usar agregação SQL em vez de processar no JavaScript
+      const [incomeResult, expenseResult, countResult] = await Promise.all([
+        prisma.transaction.aggregate({
+          where: {
+            tenantId,
+            type: "INCOME",
+            date: { gte: startDate, lte: endDate },
+          },
+          _sum: { amount: true },
+        }),
+        prisma.transaction.aggregate({
+          where: {
+            tenantId,
+            type: "EXPENSE",
+            date: { gte: startDate, lte: endDate },
+          },
+          _sum: { amount: true },
+        }),
+        prisma.transaction.count({
+          where: {
+            tenantId,
+            date: { gte: startDate, lte: endDate },
+          },
+        }),
+      ])
+
+      const income = Number(incomeResult._sum.amount || 0)
+      const expenses = Number(expenseResult._sum.amount || 0)
+
+      return {
+        income,
+        expenses,
+        net: income - expenses,
+        transactionCount: countResult,
+      }
     },
-  })
-
-  const income = transactions
-    .filter((t) => t.type === "INCOME")
-    .reduce((sum, t) => sum + Number(t.amount), 0)
-
-  const expenses = transactions
-    .filter((t) => t.type === "EXPENSE")
-    .reduce((sum, t) => sum + Number(t.amount), 0)
-
-  return {
-    income,
-    expenses,
-    net: income - expenses,
-    transactionCount: transactions.length,
-  }
+    TTL.MEDIUM // 5 minutos
+  )
 }
 
 export async function getOwnerPayouts(ownerId: string) {
@@ -122,6 +165,13 @@ export async function createOwnerPayout(formData: FormData) {
   const payout = await prisma.ownerPayout.create({
     data,
   })
+
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+    cache.del(cacheKeys.owner(data.ownerId)),
+  ])
 
   revalidatePath(`/owners/${data.ownerId}`)
   revalidatePath("/financial")

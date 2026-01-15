@@ -108,14 +108,22 @@ export async function getPropertyById(id: string) {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
-  return prisma.property.findUnique({
-    where: { id },
-    include: {
-      owner: true,
-      photos: true,
-      channels: true,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return cache.getOrSet<any>(
+    cacheKeys.property(id),
+    async () => {
+      const property = await prisma.property.findUnique({
+        where: { id },
+        include: {
+          owner: true,
+          photos: { orderBy: { order: "asc" } },
+          channels: { include: { channel: true } },
+        },
+      })
+      return property ? JSON.parse(JSON.stringify(property)) : null
     },
-  })
+    TTL.MEDIUM // 5 minutos
+  )
 }
 
 export async function updateProperty(id: string, data: any) {

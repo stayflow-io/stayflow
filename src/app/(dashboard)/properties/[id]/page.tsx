@@ -25,13 +25,13 @@ export default async function PropertyDetailPage({ params }: Props) {
     notFound()
   }
 
-  const statusMap = {
-    ACTIVE: { label: "Ativo", variant: "default" as const },
-    INACTIVE: { label: "Inativo", variant: "secondary" as const },
-    MAINTENANCE: { label: "Manutencao", variant: "destructive" as const },
+  const statusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" }> = {
+    ACTIVE: { label: "Ativo", variant: "default" },
+    INACTIVE: { label: "Inativo", variant: "secondary" },
+    MAINTENANCE: { label: "Manutencao", variant: "destructive" },
   }
 
-  const status = statusMap[property.status]
+  const status = statusMap[property.status] || statusMap.ACTIVE
 
   return (
     <div className="space-y-6">
@@ -113,7 +113,7 @@ export default async function PropertyDetailPage({ params }: Props) {
                 <div>
                   <h4 className="font-medium mb-3">Comodidades</h4>
                   <div className="flex flex-wrap gap-2">
-                    {property.amenities.map((amenity) => (
+                    {property.amenities.map((amenity: string) => (
                       <div
                         key={amenity}
                         className="flex items-center gap-1 px-3 py-1 bg-muted rounded-full text-sm"

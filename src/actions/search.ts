@@ -19,29 +19,85 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     return []
   }
 
-  const searchTerm = `%${query}%`
+  const tenantId = session.user.tenantId
+
+  // Executar todas as buscas em paralelo para melhor performance
+  const [properties, reservations, owners, tasks] = await Promise.all([
+    // Buscar imóveis
+    prisma.property.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { city: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      take: 4,
+      select: {
+        id: true,
+        name: true,
+        city: true,
+        state: true,
+      },
+    }),
+    // Buscar reservas (por nome do hóspede ou email)
+    prisma.reservation.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { guestName: { contains: query, mode: "insensitive" } },
+          { guestEmail: { contains: query, mode: "insensitive" } },
+          { guestPhone: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      take: 4,
+      select: {
+        id: true,
+        guestName: true,
+        property: { select: { name: true } },
+      },
+    }),
+    // Buscar proprietários
+    prisma.owner.findMany({
+      where: {
+        tenantId,
+        deletedAt: null,
+        OR: [
+          { name: { contains: query, mode: "insensitive" } },
+          { email: { contains: query, mode: "insensitive" } },
+          { phone: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      take: 4,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+      },
+    }),
+    // Buscar tarefas
+    prisma.task.findMany({
+      where: {
+        tenantId,
+        OR: [
+          { title: { contains: query, mode: "insensitive" } },
+          { description: { contains: query, mode: "insensitive" } },
+        ],
+      },
+      take: 4,
+      select: {
+        id: true,
+        title: true,
+        property: { select: { name: true } },
+      },
+    }),
+  ])
+
   const results: SearchResult[] = []
 
-  // Buscar imóveis
-  const properties = await prisma.property.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      deletedAt: null,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { address: { contains: query, mode: "insensitive" } },
-        { city: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      city: true,
-      state: true,
-    },
-  })
-
+  // Processar resultados
   properties.forEach((p) => {
     results.push({
       type: "property",
@@ -50,22 +106,6 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       subtitle: `${p.city}, ${p.state}`,
       href: `/properties/${p.id}`,
     })
-  })
-
-  // Buscar reservas (por nome do hóspede ou email)
-  const reservations = await prisma.reservation.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      OR: [
-        { guestName: { contains: query, mode: "insensitive" } },
-        { guestEmail: { contains: query, mode: "insensitive" } },
-        { guestPhone: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    take: 5,
-    include: {
-      property: { select: { name: true } },
-    },
   })
 
   reservations.forEach((r) => {
@@ -78,25 +118,6 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
     })
   })
 
-  // Buscar proprietários
-  const owners = await prisma.owner.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      deletedAt: null,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { email: { contains: query, mode: "insensitive" } },
-        { phone: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    take: 5,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-    },
-  })
-
   owners.forEach((o) => {
     results.push({
       type: "owner",
@@ -105,21 +126,6 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
       subtitle: o.email,
       href: `/owners/${o.id}`,
     })
-  })
-
-  // Buscar tarefas
-  const tasks = await prisma.task.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      OR: [
-        { title: { contains: query, mode: "insensitive" } },
-        { description: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    take: 5,
-    include: {
-      property: { select: { name: true } },
-    },
   })
 
   tasks.forEach((t) => {

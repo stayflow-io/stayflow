@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth"
 import { writeFile, unlink, mkdir } from "fs/promises"
 import { join } from "path"
 import { existsSync } from "fs"
+import { cache, cacheKeys } from "@/lib/redis"
 
 const UPLOAD_DIR = join(process.cwd(), "public", "uploads", "properties")
 
@@ -74,6 +75,9 @@ export async function uploadPropertyPhoto(propertyId: string, formData: FormData
       },
     })
 
+    // Invalidar cache do imóvel
+    await cache.del(cacheKeys.property(propertyId))
+
     revalidatePath(`/properties/${propertyId}`)
     return { success: true, photo }
   } catch (error) {
@@ -107,6 +111,9 @@ export async function deletePropertyPhoto(photoId: string) {
       where: { id: photoId },
     })
 
+    // Invalidar cache do imóvel
+    await cache.del(cacheKeys.property(photo.propertyId))
+
     revalidatePath(`/properties/${photo.propertyId}`)
     return { success: true }
   } catch (error) {
@@ -138,6 +145,9 @@ export async function reorderPropertyPhotos(propertyId: string, photoIds: string
         })
       )
     )
+
+    // Invalidar cache do imóvel
+    await cache.del(cacheKeys.property(propertyId))
 
     revalidatePath(`/properties/${propertyId}`)
     return { success: true }

@@ -74,6 +74,10 @@ model Owner {
   user       User?         @relation(fields: [userId], references: [id])
   properties Property[]
   payouts    OwnerPayout[]
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([email])
 }
 
 model Property {
@@ -164,6 +168,8 @@ model CalendarBlock {
   createdAt  DateTime @default(now())
 
   property Property @relation(fields: [propertyId], references: [id])
+
+  @@index([propertyId, startDate, endDate])
 }
 
 // ==================== GUESTS ====================
@@ -406,6 +412,10 @@ model Transaction {
   property    Property     @relation(fields: [propertyId], references: [id])
   reservation Reservation? @relation(fields: [reservationId], references: [id])
   createdBy   User?        @relation(fields: [createdById], references: [id])
+
+  @@index([tenantId, date])
+  @@index([propertyId, date])
+  @@index([tenantId, type])
 }
 
 enum TransactionType {

@@ -119,10 +119,15 @@ export async function createReservation(formData: FormData) {
     },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
-  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
-  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.revenueByMonth(session.user.tenantId)),
+    cache.del(cacheKeys.occupancy(session.user.tenantId)),
+    cache.del(cacheKeys.reservationsByStatus(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+    cache.delPattern(cacheKeys.calendarPattern(session.user.tenantId)),
+  ])
 
   revalidatePath("/reservations")
   revalidatePath("/calendar")
@@ -174,10 +179,15 @@ export async function updateReservation(id: string, formData: FormData) {
     },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
-  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
-  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.revenueByMonth(session.user.tenantId)),
+    cache.del(cacheKeys.occupancy(session.user.tenantId)),
+    cache.del(cacheKeys.reservationsByStatus(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+    cache.delPattern(cacheKeys.calendarPattern(session.user.tenantId)),
+  ])
 
   revalidatePath("/reservations")
   revalidatePath(`/reservations/${id}`)
@@ -216,10 +226,15 @@ export async function updateReservationStatus(id: string, status: string) {
     })
   }
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
-  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
-  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.revenueByMonth(session.user.tenantId)),
+    cache.del(cacheKeys.occupancy(session.user.tenantId)),
+    cache.del(cacheKeys.reservationsByStatus(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+    cache.delPattern(cacheKeys.calendarPattern(session.user.tenantId)),
+  ])
 
   revalidatePath("/reservations")
   revalidatePath(`/reservations/${id}`)
@@ -235,10 +250,15 @@ export async function deleteReservation(id: string) {
     where: { id, tenantId: session.user.tenantId },
   })
 
-  // Invalidar cache do dashboard
-  await cache.del(cacheKeys.dashboardStats(session.user.tenantId))
-  await cache.del(cacheKeys.revenueByMonth(session.user.tenantId))
-  await cache.del(cacheKeys.occupancy(session.user.tenantId))
+  // Invalidar caches afetados
+  await Promise.all([
+    cache.del(cacheKeys.dashboardStats(session.user.tenantId)),
+    cache.del(cacheKeys.revenueByMonth(session.user.tenantId)),
+    cache.del(cacheKeys.occupancy(session.user.tenantId)),
+    cache.del(cacheKeys.reservationsByStatus(session.user.tenantId)),
+    cache.del(cacheKeys.notifications(session.user.tenantId)),
+    cache.delPattern(cacheKeys.calendarPattern(session.user.tenantId)),
+  ])
 
   revalidatePath("/reservations")
   revalidatePath("/calendar")

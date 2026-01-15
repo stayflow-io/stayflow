@@ -269,36 +269,49 @@ export async function getOccupancyByProperty() {
   )
 }
 
-export async function getReservationsByStatus() {
+type ReservationStatusCount = {
+  name: string
+  value: number
+  color: string
+}
+
+export async function getReservationsByStatus(): Promise<ReservationStatusCount[]> {
   const session = await auth()
   if (!session?.user) throw new Error("Unauthorized")
 
   const tenantId = session.user.tenantId
-  const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
 
-  const statusCounts = await prisma.reservation.groupBy({
-    by: ["status"],
-    where: {
-      tenantId,
-      checkinDate: { gte: startOfMonth, lte: endOfMonth },
+  return cache.getOrSet<ReservationStatusCount[]>(
+    `dashboard:reservations-status:${tenantId}`,
+    async () => {
+      const now = new Date()
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+
+      const statusCounts = await prisma.reservation.groupBy({
+        by: ["status"],
+        where: {
+          tenantId,
+          checkinDate: { gte: startOfMonth, lte: endOfMonth },
+        },
+        _count: true,
+      })
+
+      const statusConfig: Record<string, { name: string; color: string }> = {
+        PENDING: { name: "Pendente", color: "#fbbf24" },
+        CONFIRMED: { name: "Confirmada", color: "#22c55e" },
+        CHECKED_IN: { name: "Check-in", color: "#3b82f6" },
+        CHECKED_OUT: { name: "Check-out", color: "#8b5cf6" },
+        CANCELLED: { name: "Cancelada", color: "#ef4444" },
+        NO_SHOW: { name: "No-show", color: "#f97316" },
+      }
+
+      return statusCounts.map((item) => ({
+        name: statusConfig[item.status]?.name || item.status,
+        value: item._count,
+        color: statusConfig[item.status]?.color || "#6b7280",
+      }))
     },
-    _count: true,
-  })
-
-  const statusConfig: Record<string, { name: string; color: string }> = {
-    PENDING: { name: "Pendente", color: "#fbbf24" },
-    CONFIRMED: { name: "Confirmada", color: "#22c55e" },
-    CHECKED_IN: { name: "Check-in", color: "#3b82f6" },
-    CHECKED_OUT: { name: "Check-out", color: "#8b5cf6" },
-    CANCELLED: { name: "Cancelada", color: "#ef4444" },
-    NO_SHOW: { name: "No-show", color: "#f97316" },
-  }
-
-  return statusCounts.map((item) => ({
-    name: statusConfig[item.status]?.name || item.status,
-    value: item._count,
-    color: statusConfig[item.status]?.color || "#6b7280",
-  }))
+    TTL.MEDIUM // 5 minutos
+  )
 }
