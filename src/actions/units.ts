@@ -290,3 +290,101 @@ export async function deleteUnit(id: string) {
   revalidatePath(`/properties/${unit.propertyId}`)
   return { success: true }
 }
+
+// ==================== PHOTOS ====================
+
+export async function addUnitPhoto(unitId: string, url: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: unitId,
+      property: { tenantId: session.user.tenantId },
+    },
+  })
+
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
+  }
+
+  // Get max order
+  const lastPhoto = await prisma.unitPhoto.findFirst({
+    where: { unitId },
+    orderBy: { order: "desc" },
+  })
+
+  const photo = await prisma.unitPhoto.create({
+    data: {
+      unitId,
+      url,
+      order: (lastPhoto?.order || 0) + 1,
+    },
+  })
+
+  // Invalidate cache
+  await cache.del(cacheKeys.unit(unitId))
+  revalidatePath(`/properties/${unit.propertyId}/units/${unitId}`)
+
+  return { success: true, photo }
+}
+
+export async function removeUnitPhoto(photoId: string) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const photo = await prisma.unitPhoto.findFirst({
+    where: { id: photoId },
+    include: {
+      unit: {
+        include: {
+          property: { select: { tenantId: true, id: true } },
+        },
+      },
+    },
+  })
+
+  if (!photo || photo.unit.property.tenantId !== session.user.tenantId) {
+    return { error: "Foto nao encontrada" }
+  }
+
+  await prisma.unitPhoto.delete({ where: { id: photoId } })
+
+  // Invalidate cache
+  await cache.del(cacheKeys.unit(photo.unitId))
+  revalidatePath(`/properties/${photo.unit.property.id}/units/${photo.unitId}`)
+
+  return { success: true }
+}
+
+export async function reorderUnitPhotos(unitId: string, photoIds: string[]) {
+  const session = await auth()
+  if (!session?.user) throw new Error("Unauthorized")
+
+  const unit = await prisma.unit.findFirst({
+    where: {
+      id: unitId,
+      property: { tenantId: session.user.tenantId },
+    },
+  })
+
+  if (!unit) {
+    return { error: "Unidade nao encontrada" }
+  }
+
+  // Update order for each photo
+  await Promise.all(
+    photoIds.map((id, index) =>
+      prisma.unitPhoto.update({
+        where: { id },
+        data: { order: index },
+      })
+    )
+  )
+
+  // Invalidate cache
+  await cache.del(cacheKeys.unit(unitId))
+  revalidatePath(`/properties/${unit.propertyId}/units/${unitId}`)
+
+  return { success: true }
+}

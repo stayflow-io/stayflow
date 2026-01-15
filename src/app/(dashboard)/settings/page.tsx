@@ -3,9 +3,10 @@ import { prisma } from "@/lib/prisma"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Building2, Users, Mail, Phone, Crown, User, Shield, Settings2, Activity } from "lucide-react"
+import { Building2, Users, Mail, Phone, Crown, User, Shield, Settings2, Activity, ImageIcon } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { TenantLogoUpload } from "./tenant-logo-upload"
 
 async function getSettingsData(tenantId: string) {
   const [tenant, users] = await Promise.all([
@@ -68,6 +69,12 @@ export default async function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {session.user.role === "ADMIN" && (
+              <div>
+                <p className="text-sm text-muted-foreground mb-2">Logo da Empresa</p>
+                <TenantLogoUpload currentLogo={tenant.logo} />
+              </div>
+            )}
             <div>
               <p className="text-sm text-muted-foreground">Nome da Empresa</p>
               <p className="font-medium">{tenant.name}</p>

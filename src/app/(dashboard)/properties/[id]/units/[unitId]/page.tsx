@@ -3,10 +3,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Bed, Bath, Users, DollarSign, User, Pencil, Wifi, ImageIcon } from "lucide-react"
+import { ArrowLeft, Bed, Bath, Users, DollarSign, User, Pencil, Wifi } from "lucide-react"
 import { getUnit } from "@/actions/units"
 import { UnitActions } from "./unit-actions"
-import NextImage from "next/image"
+import { UnitPhotos } from "./unit-photos"
 
 interface Props {
   params: { id: string; unitId: string }
@@ -61,24 +61,7 @@ export default async function UnitDetailPage({ params }: Props) {
       </div>
 
       {/* Fotos */}
-      {unit.photos?.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {unit.photos.map((photo: { id: string; url: string }) => (
-                <div key={photo.id} className="relative aspect-video rounded-lg overflow-hidden bg-muted">
-                  <NextImage
-                    src={photo.url}
-                    alt="Foto da unidade"
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <UnitPhotos unitId={unit.id} photos={unit.photos || []} />
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-2">
